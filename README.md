@@ -6,7 +6,7 @@ Michibiki is an open-source, vendor-neutral CLI and interactive TUI for configur
 
 ---
 
-## ⚡ Quick Install
+## Quick Install
 
 ```bash
 go install github.com/sekai-labs/michibiki/cmd/michibiki@latest
@@ -21,7 +21,7 @@ go build -o michibiki ./cmd/michibiki
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Add a device profile
@@ -37,7 +37,7 @@ michibiki -d core-fw interface list
 
 ---
 
-## 🎯 Key Highlights
+## Key Highlights
 
 - **Vendor-Neutral:** Single unified CLI and TUI for 6+ major network platforms.
 - **Subnet IPAM & Free IP Finder:** View real-time IP allocation matrices and discover next available unassigned static IPs for VM provisioning.
@@ -47,17 +47,17 @@ michibiki -d core-fw interface list
 
 ---
 
-## 📚 Documentation & Wiki
+## Documentation & Wiki
 
-Detailed guides, full CLI reference, and developer documentation are available in the [Wiki](docs/wiki/Home.md):
+Detailed guides, full CLI reference, and developer documentation are available in the [Wiki](https://github.com/sekai-labs/michibiki/wiki):
 
-- [Installation Guide](docs/wiki/Installation.md)
-- [Device Profiles & Vault](docs/wiki/Device-Profiles.md)
-- [CLI Command Reference](docs/wiki/CLI-Reference.md)
-- [IPAM & Free IP Finder](docs/wiki/IPAM.md)
-- [Interactive TUI Guide](docs/wiki/TUI-Guide.md)
-- [Plugin Development Guide](docs/wiki/Plugin-Development.md)
-- [Safety & Commit-Confirm](docs/wiki/Safety-Engine.md)
+- [Installation Guide](https://github.com/sekai-labs/michibiki/wiki/Installation)
+- [Device Profiles & Vault](https://github.com/sekai-labs/michibiki/wiki/Device-Profiles)
+- [CLI Command Reference](https://github.com/sekai-labs/michibiki/wiki/CLI-Reference)
+- [IPAM & Free IP Finder](https://github.com/sekai-labs/michibiki/wiki/IPAM)
+- [Interactive TUI Guide](https://github.com/sekai-labs/michibiki/wiki/TUI-Guide)
+- [Plugin Development Guide](https://github.com/sekai-labs/michibiki/wiki/Plugin-Development)
+- [Safety & Commit-Confirm](https://github.com/sekai-labs/michibiki/wiki/Safety-Engine)
 
 ---
 
