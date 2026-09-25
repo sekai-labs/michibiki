@@ -113,7 +113,30 @@ func (c *HTTPClient) Do(ctx context.Context, method, path string, body any, targ
 			*byteTarget = respBytes
 			return nil
 		}
-		return json.Unmarshal(respBytes, target)
+
+		contentType := resp.Header.Get("Content-Type")
+		trimmed := bytes.TrimSpace(respBytes)
+		if strings.HasPrefix(strings.ToLower(contentType), "text/html") ||
+			strings.HasPrefix(strings.ToLower(contentType), "text/xml") ||
+			(len(trimmed) > 0 && trimmed[0] == '<') {
+			snippet := string(trimmed)
+			if len(snippet) > 120 {
+				snippet = snippet[:120] + "..."
+			}
+			snippet = strings.ReplaceAll(snippet, "\n", " ")
+			snippet = strings.ReplaceAll(snippet, "\r", "")
+			return fmt.Errorf("endpoint returned HTML/non-JSON response (check URL, credentials, or API path): %s", snippet)
+		}
+
+		if err := json.Unmarshal(respBytes, target); err != nil {
+			snippet := string(trimmed)
+			if len(snippet) > 100 {
+				snippet = snippet[:100] + "..."
+			}
+			snippet = strings.ReplaceAll(snippet, "\n", " ")
+			return fmt.Errorf("failed to parse JSON response (%w): %s", err, snippet)
+		}
+		return nil
 	}
 
 	return nil

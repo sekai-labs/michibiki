@@ -525,3 +525,114 @@ func TestTUIDetailSubTabsKeymaps(t *testing.T) {
 		}
 	}
 }
+
+func TestTUIDetailDirectSubTabKeymaps(t *testing.T) {
+	prov := &dummyProvider{}
+	m := tui.NewModel(prov, "test-box")
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	currModel := updated.(tui.Model)
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	currModel = updated.(tui.Model)
+	if currModel.FocusedPane != tui.PaneDetail {
+		t.Fatalf("expected FocusedPane PaneDetail on 't', got %v", currModel.FocusedPane)
+	}
+	if currModel.DetailSubTab != 1 {
+		t.Fatalf("expected DetailSubTab 1 (Live Traffic) on 't', got %d", currModel.DetailSubTab)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	currModel = updated.(tui.Model)
+	if currModel.DetailSubTab != 2 {
+		t.Fatalf("expected DetailSubTab 2 (IPAM Matrix) on 'i', got %d", currModel.DetailSubTab)
+	}
+
+	currModel.DetailSubTab = 0
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("m")})
+	currModel = updated.(tui.Model)
+	if currModel.DetailSubTab != 2 {
+		t.Fatalf("expected DetailSubTab 2 (IPAM Matrix) on 'm', got %d", currModel.DetailSubTab)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	currModel = updated.(tui.Model)
+	if currModel.DetailSubTab != 3 {
+		t.Fatalf("expected DetailSubTab 3 (Running Config) on 'c', got %d", currModel.DetailSubTab)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("o")})
+	currModel = updated.(tui.Model)
+	if currModel.DetailSubTab != 0 {
+		t.Fatalf("expected DetailSubTab 0 (Overview) on 'o', got %d", currModel.DetailSubTab)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2")})
+	currModel = updated.(tui.Model)
+	if currModel.FocusedPane != tui.PaneDetail {
+		t.Fatalf("expected FocusedPane to stay PaneDetail on '2', got %v", currModel.FocusedPane)
+	}
+	if currModel.DetailSubTab != 1 {
+		t.Fatalf("expected DetailSubTab 1 on '2' while in PaneDetail, got %d", currModel.DetailSubTab)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	currModel = updated.(tui.Model)
+	if currModel.DetailSubTab != 2 {
+		t.Fatalf("expected DetailSubTab 2 on '3' while in PaneDetail, got %d", currModel.DetailSubTab)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("4")})
+	currModel = updated.(tui.Model)
+	if currModel.DetailSubTab != 3 {
+		t.Fatalf("expected DetailSubTab 3 on '4' while in PaneDetail, got %d", currModel.DetailSubTab)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1")})
+	currModel = updated.(tui.Model)
+	if currModel.DetailSubTab != 0 {
+		t.Fatalf("expected DetailSubTab 0 on '1' while in PaneDetail, got %d", currModel.DetailSubTab)
+	}
+}
+
+type dummyPluginProvider struct {
+	dummyProvider
+	id      string
+	version string
+}
+
+func (d *dummyPluginProvider) ID() string      { return d.id }
+func (d *dummyPluginProvider) Version() string { return d.version }
+func (d *dummyPluginProvider) Name() string    { return "traefik-plugin" }
+
+func TestTUIPluginCustomUI(t *testing.T) {
+	prov := &dummyPluginProvider{
+		id:      "traefik-plugin",
+		version: "1.2.3",
+	}
+	m := tui.NewModel(prov, "plugin-box")
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	currModel := updated.(tui.Model)
+	viewStr := currModel.View()
+	if !strings.Contains(viewStr, "EXTERNAL") || !strings.Contains(viewStr, "PLUGIN PROVIDER") {
+		t.Fatalf("expected view to contain EXTERNAL PLUGIN PROVIDER, got:\n%s", viewStr)
+	}
+	if !strings.Contains(viewStr, "traefik-plugin") {
+		t.Fatalf("expected view to contain plugin name, got:\n%s", viewStr)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")})
+	currModel = updated.(tui.Model)
+	if currModel.FocusedPane != tui.PaneDetail {
+		t.Fatalf("expected FocusedPane PaneDetail on 'p', got %v", currModel.FocusedPane)
+	}
+	if currModel.DetailSubTab != 4 {
+		t.Fatalf("expected DetailSubTab 4 on 'p', got %d", currModel.DetailSubTab)
+	}
+
+	currModel.DetailSubTab = 0
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("5")})
+	currModel = updated.(tui.Model)
+	if currModel.DetailSubTab != 4 {
+		t.Fatalf("expected DetailSubTab 4 on '5' while in PaneDetail, got %d", currModel.DetailSubTab)
+	}
+}

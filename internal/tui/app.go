@@ -34,6 +34,7 @@ const (
 	SubTabLiveTraffic
 	SubTabIPAMMatrix
 	SubTabRunningConfig
+	SubTabPlugin
 )
 
 var subTabNames = []string{
@@ -41,6 +42,30 @@ var subTabNames = []string{
 	"2 Live Traffic",
 	"3 IPAM Matrix",
 	"4 Running Config",
+}
+
+func (m Model) isPluginProvider() bool {
+	if m.Provider == nil {
+		return false
+	}
+	name := m.Provider.Name()
+	if name == "opnsense" || name == "pfsense" || name == "routeros" || name == "openwrt" || name == "vyos" || name == "frr" || name == "mock" {
+		return false
+	}
+	return true
+}
+
+func (m Model) getSubTabNames() []string {
+	if m.isPluginProvider() {
+		return []string{
+			"1 Overview",
+			"2 Live Traffic",
+			"3 IPAM Matrix",
+			"4 Running Config",
+			"5 Plugin UI",
+		}
+	}
+	return subTabNames
 }
 
 type DataFetchedMsg struct {
@@ -266,28 +291,65 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(fetchDataCmd(m.Provider), clearFlashCmd())
 
 		case "1":
+			if m.FocusedPane == PaneDetail {
+				m.DetailSubTab = int(SubTabOverview)
+				m.Viewport.GotoTop()
+				m.StatusFlash = "Opened Overview"
+				m.updateViewportContent()
+				return m, clearFlashCmd()
+			}
 			m.ActivePanel = 0
 			m.ActiveTab = 0
 			m.FocusedPane = PaneDock
 			m.updateViewportContent()
 			return m, nil
 		case "2":
+			if m.FocusedPane == PaneDetail {
+				m.DetailSubTab = int(SubTabLiveTraffic)
+				m.Viewport.GotoTop()
+				m.StatusFlash = "Opened Live Traffic"
+				m.updateViewportContent()
+				return m, tea.Batch(fetchDataCmd(m.Provider), clearFlashCmd())
+			}
 			m.ActivePanel = 1
 			m.ActiveTab = 1
 			m.FocusedPane = PaneDock
 			m.updateViewportContent()
 			return m, nil
 		case "3":
+			if m.FocusedPane == PaneDetail {
+				m.DetailSubTab = int(SubTabIPAMMatrix)
+				m.Viewport.GotoTop()
+				m.StatusFlash = "Opened IPAM Matrix"
+				m.updateViewportContent()
+				return m, clearFlashCmd()
+			}
 			m.ActivePanel = 2
 			m.ActiveTab = 2
 			m.FocusedPane = PaneDock
 			m.updateViewportContent()
 			return m, nil
 		case "4":
+			if m.FocusedPane == PaneDetail {
+				m.DetailSubTab = int(SubTabRunningConfig)
+				m.Viewport.GotoTop()
+				m.StatusFlash = "Opened Config"
+				m.updateViewportContent()
+				return m, clearFlashCmd()
+			}
 			m.ActivePanel = 3
 			m.ActiveTab = 3
 			m.FocusedPane = PaneDock
 			m.updateViewportContent()
+			return m, nil
+		case "5":
+			if m.FocusedPane == PaneDetail && m.isPluginProvider() {
+				m.DetailSubTab = int(SubTabPlugin)
+				m.Viewport.GotoTop()
+				m.StatusFlash = "Opened Plugin UI"
+				m.updateViewportContent()
+				return m, clearFlashCmd()
+			}
 			return m, nil
 
 		case "tab":
@@ -303,18 +365,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "h":
 			m.FocusedPane = PaneDock
+			m.updateViewportContent()
 			return m, nil
 		case "l", "enter":
 			m.FocusedPane = PaneDetail
+			m.updateViewportContent()
 			return m, nil
-
 		case "[", "<", ",":
-			m.DetailSubTab = (m.DetailSubTab - 1 + 4) % 4
+			tabsCount := len(m.getSubTabNames())
+			m.DetailSubTab = (m.DetailSubTab - 1 + tabsCount) % tabsCount
 			m.Viewport.GotoTop()
 			m.updateViewportContent()
 			return m, nil
 		case "]", ">", ".":
-			m.DetailSubTab = (m.DetailSubTab + 1) % 4
+			tabsCount := len(m.getSubTabNames())
+			m.DetailSubTab = (m.DetailSubTab + 1) % tabsCount
 			m.Viewport.GotoTop()
 			m.updateViewportContent()
 			return m, nil
@@ -339,16 +404,44 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, clearFlashCmd()
 
-		case "o":
+		case "o", "O":
 			m.FocusedPane = PaneDetail
 			m.DetailSubTab = int(SubTabOverview)
+			m.Viewport.GotoTop()
 			m.StatusFlash = "Opened Overview"
+			m.updateViewportContent()
 			return m, clearFlashCmd()
 
-		case "C":
+		case "t", "T":
+			m.FocusedPane = PaneDetail
+			m.DetailSubTab = int(SubTabLiveTraffic)
+			m.Viewport.GotoTop()
+			m.StatusFlash = "Opened Live Traffic"
+			m.updateViewportContent()
+			return m, tea.Batch(fetchDataCmd(m.Provider), clearFlashCmd())
+
+		case "i", "I", "m", "M":
+			m.FocusedPane = PaneDetail
+			m.DetailSubTab = int(SubTabIPAMMatrix)
+			m.Viewport.GotoTop()
+			m.StatusFlash = "Opened IPAM Matrix"
+			m.updateViewportContent()
+			return m, clearFlashCmd()
+
+		case "c", "C":
 			m.FocusedPane = PaneDetail
 			m.DetailSubTab = int(SubTabRunningConfig)
+			m.Viewport.GotoTop()
 			m.StatusFlash = "Opened Config"
+			m.updateViewportContent()
+			return m, clearFlashCmd()
+
+		case "p", "P":
+			m.FocusedPane = PaneDetail
+			m.DetailSubTab = int(SubTabPlugin)
+			m.Viewport.GotoTop()
+			m.StatusFlash = "Opened Plugin UI"
+			m.updateViewportContent()
 			return m, clearFlashCmd()
 		case "k", "up":
 			if m.FocusedPane == PaneDock {
@@ -701,11 +794,16 @@ func (m Model) renderFooter() string {
 	}
 
 	var keys []string
-	keys = append(keys, StyleStatusKey.Render("1-4")+" panels")
+	keys = append(keys, StyleStatusKey.Render("1-4")+" panels/subtabs")
 	keys = append(keys, StyleStatusKey.Render("h/l")+" dock/detail")
 	keys = append(keys, StyleStatusKey.Render("j/k")+" nav")
 	keys = append(keys, StyleStatusKey.Render("[]")+" tabs")
-	keys = append(keys, StyleStatusKey.Render("o")+" open")
+	keys = append(keys, StyleStatusKey.Render("t")+" traffic")
+	keys = append(keys, StyleStatusKey.Render("i")+" ipam")
+	keys = append(keys, StyleStatusKey.Render("c")+" config")
+	if m.isPluginProvider() {
+		keys = append(keys, StyleStatusKey.Render("p")+" plugin")
+	}
 	keys = append(keys, StyleStatusKey.Render("/")+" filter")
 	keys = append(keys, StyleStatusKey.Render("y")+" yank")
 	keys = append(keys, StyleStatusKey.Render("r")+" reload")
@@ -972,7 +1070,7 @@ func (m Model) renderRightDetail(width, height int) string {
 	isDetailActive := (m.FocusedPane == PaneDetail)
 
 	var tabStrs []string
-	for idx, name := range subTabNames {
+	for idx, name := range m.getSubTabNames() {
 		if idx == m.DetailSubTab {
 			tabStrs = append(tabStrs, StyleSubTabActive.Render(name))
 		} else {
@@ -1061,6 +1159,20 @@ func (m Model) renderDetailContent() string {
 	case SubTabOverview:
 		switch m.ActivePanel {
 		case 0:
+			if plug, ok := m.Provider.(interface {
+				ID() string
+				Version() string
+				Capabilities() provider.Capabilities
+			}); ok && m.Provider.Name() != "opnsense" && m.Provider.Name() != "pfsense" && m.Provider.Name() != "routeros" && m.Provider.Name() != "openwrt" && m.Provider.Name() != "vyos" && m.Provider.Name() != "frr" && m.Provider.Name() != "mock" {
+				return views.RenderPluginCustomUI(views.PluginViewData{
+					PluginName:   plug.ID(),
+					Version:      plug.Version(),
+					Capabilities: plug.Capabilities().Strings(),
+					SystemInfo:   m.LastFetched.SysInfo,
+					Interfaces:   m.LastFetched.Ifaces,
+					Stats:        m.LastFetched.Stats,
+				}, contentWidth, contentHeight)
+			}
 			return views.RenderDashboard(views.DashboardData{
 				SystemInfo: m.LastFetched.SysInfo,
 				Interfaces: m.LastFetched.Ifaces,
@@ -1124,8 +1236,31 @@ func (m Model) renderDetailContent() string {
 			SafetyStatus:  "Safety Engine Active — rollback tracking ready",
 			Error:         m.LastFetched.Err,
 		}, contentWidth, contentHeight)
-	}
 
+	case SubTabPlugin:
+		var plugName, plugVer string
+		var plugCaps []string
+		if plug, ok := m.Provider.(interface {
+			ID() string
+			Version() string
+			Capabilities() provider.Capabilities
+		}); ok {
+			plugName = plug.ID()
+			plugVer = plug.Version()
+			plugCaps = plug.Capabilities().Strings()
+		} else if m.Provider != nil {
+			plugName = m.Provider.Name()
+			plugCaps = m.Provider.Capabilities().Strings()
+		}
+		return views.RenderPluginCustomUI(views.PluginViewData{
+			PluginName:   plugName,
+			Version:      plugVer,
+			Capabilities: plugCaps,
+			SystemInfo:   m.LastFetched.SysInfo,
+			Interfaces:   m.LastFetched.Ifaces,
+			Stats:        m.LastFetched.Stats,
+		}, contentWidth, contentHeight)
+	}
 	return ""
 }
 
@@ -1133,7 +1268,7 @@ func (m Model) overlayHelpModal(baseView string) string {
 	modalContent := fmt.Sprintf(`%s
 
 %s
-  1..4        Switch Dock Panels (Status, Ifaces, Routes, Services)
+  1..4        Switch Dock Panels / Detail Sub-Tabs
   Tab         Cycle Panels Clockwise
   Shift+Tab   Cycle Panels Counter-Clockwise
   h           Focus Left Dock
@@ -1148,8 +1283,11 @@ func (m Model) overlayHelpModal(baseView string) string {
 
 %s
   [ / ]       Previous / Next Detail Sub-Tab
-  o           Open selected item in Overview
-  C           Jump to Running Config Inspector
+  o           Open Overview Sub-Tab
+  t           Open Live Traffic Monitor
+  i / m       Open IPAM Matrix
+  c / C       Jump to Running Config Inspector
+  p / P       Open Plugin Custom UI (if plugin provider)
   /           Enter Filter / Search Mode
   Esc         Exit Search / Clear Filter
   y           Yank IP / MAC / Hostname (OSC 52)
