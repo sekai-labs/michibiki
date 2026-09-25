@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -200,16 +201,58 @@ func (p *Provider) ListInterfaces(ctx context.Context) ([]model.Interface, error
 			iface.MTU = int(mtu)
 		}
 
-		if ipv4, ok := data["ipv4"].([]any); ok {
-			for _, item := range ipv4 {
+		addIPv4 := func(val string) {
+			val = strings.TrimSpace(val)
+			if val == "" || val == "<nil>" {
+				return
+			}
+			if strings.Contains(val, "/") {
+				if _, err := netip.ParsePrefix(val); err == nil {
+					iface.IPv4Addresses = append(iface.IPv4Addresses, val)
+				}
+			} else {
+				if addr, err := netip.ParseAddr(val); err == nil && addr.Is4() {
+					iface.IPv4Addresses = append(iface.IPv4Addresses, val+"/24")
+				}
+			}
+		}
+
+		if ipv4List, ok := data["ipv4"].([]any); ok {
+			for _, item := range ipv4List {
 				if m, ok := item.(map[string]any); ok {
 					ip := fmt.Sprintf("%v", m["ipaddr"])
 					mask := fmt.Sprintf("%v", m["subnetbits"])
-					if ip != "" && mask != "" {
+					if ip != "" && ip != "<nil>" && mask != "" && mask != "<nil>" {
 						iface.IPv4Addresses = append(iface.IPv4Addresses, fmt.Sprintf("%s/%s", ip, mask))
 					}
+				} else if s, ok := item.(string); ok {
+					addIPv4(s)
 				}
 			}
+		} else if s, ok := data["ipv4"].(string); ok {
+			addIPv4(s)
+		}
+
+		if ip, ok := data["ipaddr"].(string); ok {
+			mask := fmt.Sprintf("%v", data["subnetbits"])
+			if mask == "" || mask == "<nil>" {
+				mask = fmt.Sprintf("%v", data["subnet"])
+			}
+			if mask != "" && mask != "<nil>" {
+				addIPv4(fmt.Sprintf("%s/%s", ip, mask))
+			} else {
+				addIPv4(ip)
+			}
+		}
+
+		if addr, ok := data["addr"].(string); ok {
+			addIPv4(addr)
+		}
+		if address, ok := data["address"].(string); ok {
+			addIPv4(address)
+		}
+		if ipVal, ok := data["ip"].(string); ok {
+			addIPv4(ipVal)
 		}
 		return iface
 	}

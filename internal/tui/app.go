@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/sekai-labs/michibiki/internal/tui/views"
@@ -43,6 +44,8 @@ type Model struct {
 	FilterInput    string
 	FilterActive   bool
 	IPAMSelected   int
+	Viewport       viewport.Model
+	ViewportReady  bool
 	TrafficHistory map[string][]float64
 	LastFetched    DataFetchedMsg
 	Loading        bool
@@ -146,8 +149,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+		contentHeight := m.Height - 5
+		if contentHeight < 5 {
+			contentHeight = 5
+		}
+		if !m.ViewportReady {
+			m.Viewport = viewport.New(m.Width, contentHeight)
+			m.ViewportReady = true
+		} else {
+			m.Viewport.Width = m.Width
+			m.Viewport.Height = contentHeight
+		}
+		m.updateViewportContent()
 		return m, nil
-
 	case TickMsg:
 		var cmd tea.Cmd
 		if m.ActiveTab == 7 {
@@ -169,6 +183,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.TrafficHistory[stat.InterfaceName] = history
 		}
+		m.updateViewportContent()
 		return m, nil
 
 	case tea.KeyMsg:
@@ -176,15 +191,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc", "enter":
 				m.FilterActive = false
+				m.updateViewportContent()
 				return m, nil
 			case "backspace":
 				if len(m.FilterInput) > 0 {
 					m.FilterInput = m.FilterInput[:len(m.FilterInput)-1]
+					m.updateViewportContent()
 				}
 				return m, nil
 			default:
 				if len(msg.String()) == 1 {
 					m.FilterInput += msg.String()
+					m.updateViewportContent()
 				}
 				return m, nil
 			}
@@ -198,16 +216,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Loading = true
 			return m, fetchDataCmd(m.Provider)
 
-		case "tab":
+		case "tab", "l":
 			m.ActiveTab = (m.ActiveTab + 1) % len(tabNames)
+			m.Viewport.GotoTop()
+			m.updateViewportContent()
 			return m, nil
 
-		case "shift+tab":
+		case "shift+tab", "h":
 			m.ActiveTab = (m.ActiveTab - 1 + len(tabNames)) % len(tabNames)
+			m.Viewport.GotoTop()
+			m.updateViewportContent()
 			return m, nil
 
 		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 			m.ActiveTab = int(msg.String()[0] - '1')
+			m.Viewport.GotoTop()
+			m.updateViewportContent()
 			return m, nil
 
 		case "/":
@@ -217,23 +241,104 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.FilterActive = false
 			m.FilterInput = ""
+			m.updateViewportContent()
 			return m, nil
 
 		case "up", "k":
-			if m.ActiveTab == 2 && m.IPAMSelected > 0 {
-				m.IPAMSelected--
+			if m.ActiveTab == 2 {
+				if m.IPAMSelected > 0 {
+					m.IPAMSelected--
+					m.updateViewportContent()
+				}
+			} else {
+				m.Viewport.LineUp(1)
 			}
 			return m, nil
 
 		case "down", "j":
-			if m.ActiveTab == 2 && m.IPAMSelected < len(m.LastFetched.Subnets)-1 {
-				m.IPAMSelected++
+			if m.ActiveTab == 2 {
+				if m.IPAMSelected < len(m.LastFetched.Subnets)-1 {
+					m.IPAMSelected++
+					m.updateViewportContent()
+				}
+			} else {
+				m.Viewport.LineDown(1)
+			}
+			return m, nil
+
+		case "g":
+			if m.ActiveTab == 2 {
+				m.IPAMSelected = 0
+				m.updateViewportContent()
+			} else {
+				m.Viewport.GotoTop()
+			}
+			return m, nil
+
+		case "G":
+			if m.ActiveTab == 2 {
+				if len(m.LastFetched.Subnets) > 0 {
+					m.IPAMSelected = len(m.LastFetched.Subnets) - 1
+					m.updateViewportContent()
+				}
+			} else {
+				m.Viewport.GotoBottom()
+			}
+			return m, nil
+
+		case "ctrl+d":
+			if m.ActiveTab == 2 {
+				m.IPAMSelected += 5
+				if m.IPAMSelected >= len(m.LastFetched.Subnets) {
+					m.IPAMSelected = len(m.LastFetched.Subnets) - 1
+				}
+				if m.IPAMSelected < 0 {
+					m.IPAMSelected = 0
+				}
+				m.updateViewportContent()
+			} else {
+				m.Viewport.HalfViewDown()
+			}
+			return m, nil
+
+		case "ctrl+u":
+			if m.ActiveTab == 2 {
+				m.IPAMSelected -= 5
+				if m.IPAMSelected < 0 {
+					m.IPAMSelected = 0
+				}
+				m.updateViewportContent()
+			} else {
+				m.Viewport.HalfViewUp()
 			}
 			return m, nil
 		}
 	}
 
-	return m, nil
+	var cmd tea.Cmd
+	m.Viewport, cmd = m.Viewport.Update(msg)
+	return m, cmd
+}
+
+func (m *Model) updateViewportContent() {
+	raw := m.renderRawContent()
+	if m.FilterInput == "" {
+		m.Viewport.SetContent(raw)
+		return
+	}
+
+	query := strings.ToLower(m.FilterInput)
+	lines := strings.Split(raw, "\n")
+	var filtered []string
+	for idx, line := range lines {
+		if idx < 2 || strings.Contains(strings.ToLower(line), query) {
+			filtered = append(filtered, line)
+		}
+	}
+	if len(filtered) <= 2 {
+		filtered = append(filtered, lipgloss.NewStyle().Foreground(lipgloss.Color("#E06C75")).Render("  [No matches for search query: "+m.FilterInput+"]"))
+	}
+	m.Viewport.SetContent(strings.Join(filtered, "\n"))
 }
 
 func (m Model) View() string {
@@ -243,11 +348,17 @@ func (m Model) View() string {
 
 	header := m.renderHeader()
 	tabs := m.renderTabs()
-	content := m.renderContent()
+	var content string
+	if m.ViewportReady {
+		content = m.Viewport.View()
+	} else {
+		content = m.renderRawContent()
+	}
 	footer := m.renderFooter()
 
 	return lipgloss.JoinVertical(lipgloss.Left, header, tabs, content, footer)
 }
+
 
 func (m Model) renderHeader() string {
 	dev := m.DeviceName
@@ -294,7 +405,7 @@ func (m Model) renderTabs() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
 }
 
-func (m Model) renderContent() string {
+func (m Model) renderRawContent() string {
 	contentHeight := m.Height - 5
 	if contentHeight < 5 {
 		contentHeight = 5
@@ -374,10 +485,12 @@ func (m Model) renderContent() string {
 
 func (m Model) renderFooter() string {
 	var keys []string
-	keys = append(keys, StyleStatusKey.Render("1-9")+" Switch Tab")
-	keys = append(keys, StyleStatusKey.Render("Tab")+" Next")
+	keys = append(keys, StyleStatusKey.Render("1-9 / h,l")+" Tabs")
+	keys = append(keys, StyleStatusKey.Render("j,k")+" Scroll")
+	keys = append(keys, StyleStatusKey.Render("^d,^u")+" Page")
+	keys = append(keys, StyleStatusKey.Render("g,G")+" Top/Bottom")
+	keys = append(keys, StyleStatusKey.Render("/")+" Search")
 	keys = append(keys, StyleStatusKey.Render("r")+" Refresh")
-	keys = append(keys, StyleStatusKey.Render("/")+" Filter")
 	keys = append(keys, StyleStatusKey.Render("q")+" Quit")
 
 	if m.FilterActive {

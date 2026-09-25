@@ -439,6 +439,38 @@ func DiscoverSubnets(
 			results = append(results, usage)
 		}
 	}
+	if len(results) == 0 {
+		for _, lease := range leases {
+			if lease.SubnetCIDR != "" {
+				if pfx, err := netip.ParsePrefix(lease.SubnetCIDR); err == nil && pfx.Addr().Is4() {
+					pfx = pfx.Masked()
+					if !seenPrefixes[pfx] {
+						seenPrefixes[pfx] = true
+						usage := CalculateSubnetUsage(pfx, lease.Interface, 0, interfaces, leases, arpEntries, wgPeers)
+						results = append(results, usage)
+					}
+				}
+			}
+			if addr, err := netip.ParseAddr(lease.IPAddress); err == nil && addr.Is4() && !addr.IsLoopback() && !addr.IsLinkLocalUnicast() && !addr.IsMulticast() {
+				pfx := netip.PrefixFrom(addr, 24).Masked()
+				if !seenPrefixes[pfx] {
+					seenPrefixes[pfx] = true
+					usage := CalculateSubnetUsage(pfx, lease.Interface, 0, interfaces, leases, arpEntries, wgPeers)
+					results = append(results, usage)
+				}
+			}
+		}
+		for _, arp := range arpEntries {
+			if addr, err := netip.ParseAddr(arp.IPAddress); err == nil && addr.Is4() && !addr.IsLoopback() && !addr.IsLinkLocalUnicast() && !addr.IsMulticast() {
+				pfx := netip.PrefixFrom(addr, 24).Masked()
+				if !seenPrefixes[pfx] {
+					seenPrefixes[pfx] = true
+					usage := CalculateSubnetUsage(pfx, arp.Interface, 0, interfaces, leases, arpEntries, wgPeers)
+					results = append(results, usage)
+				}
+			}
+		}
+	}
 
 	slices.SortFunc(results, func(a, b SubnetUsage) int {
 		return cmp.Compare(a.CIDR.String(), b.CIDR.String())
