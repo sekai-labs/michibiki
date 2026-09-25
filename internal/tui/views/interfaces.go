@@ -12,6 +12,7 @@ type InterfacesData struct {
 	Interfaces    []model.Interface
 	Stats         map[string]model.InterfaceStats
 	SelectedIndex int
+	Filter        string
 	Error         error
 }
 
@@ -21,11 +22,47 @@ func RenderInterfaces(data InterfacesData, width, height int) string {
 			theme.StyleError.Render("Failed to load interfaces: " + data.Error.Error()),
 		)
 	}
-
 	if len(data.Interfaces) == 0 {
 		return theme.StyleCard.Width(width - 4).Render(
 			theme.StyleMuted.Render("No interfaces found."),
 		)
+	}
+
+	var ifaces []model.Interface
+	if data.Filter != "" {
+		query := strings.ToLower(data.Filter)
+		for _, iface := range data.Interfaces {
+			matched := strings.Contains(strings.ToLower(iface.Name), query) ||
+				strings.Contains(strings.ToLower(string(iface.Type)), query) ||
+				strings.Contains(strings.ToLower(iface.MACAddress), query) ||
+				strings.Contains(strings.ToLower(iface.Description), query)
+			if !matched {
+				for _, ip := range iface.IPv4Addresses {
+					if strings.Contains(strings.ToLower(ip), query) {
+						matched = true
+						break
+					}
+				}
+			}
+			if !matched {
+				for _, ip := range iface.IPv6Addresses {
+					if strings.Contains(strings.ToLower(ip), query) {
+						matched = true
+						break
+					}
+				}
+			}
+			if matched {
+				ifaces = append(ifaces, iface)
+			}
+		}
+		if len(ifaces) == 0 {
+			return theme.StyleCard.Width(width - 4).Render(
+				theme.StyleMuted.Render(fmt.Sprintf("No interfaces matching search query: %s", data.Filter)),
+			)
+		}
+	} else {
+		ifaces = data.Interfaces
 	}
 
 	header := fmt.Sprintf("%-12s %-10s %-8s %-8s %-20s %-18s %-10s %-12s %-12s",
@@ -33,12 +70,11 @@ func RenderInterfaces(data InterfacesData, width, height int) string {
 	headerRendered := theme.StyleTableHeader.Render(header)
 
 	var rows []string
-	for i, iface := range data.Interfaces {
+	for i, iface := range ifaces {
 		adminBadge := theme.StyleBadgeOnline.Render("UP")
 		if iface.AdminStatus != model.AdminStatusUp {
 			adminBadge = theme.StyleBadgeOffline.Render("DOWN")
 		}
-
 		operBadge := theme.StyleBadgeOnline.Render("UP")
 		if iface.OperStatus != model.OperStatusUp {
 			operBadge = theme.StyleBadgeOffline.Render(strings.ToUpper(string(iface.OperStatus)))

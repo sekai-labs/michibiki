@@ -12,6 +12,7 @@ import (
 type IPAMData struct {
 	Subnets       []ipam.SubnetUsage
 	SelectedIndex int
+	Filter        string
 	Error         error
 }
 
@@ -28,6 +29,36 @@ func RenderIPAM(data IPAMData, width, height int) string {
 		)
 	}
 
+	var subnets []ipam.SubnetUsage
+	if data.Filter != "" {
+		q := strings.ToLower(data.Filter)
+		for _, sub := range data.Subnets {
+			matched := strings.Contains(strings.ToLower(sub.CIDR.String()), q) ||
+				strings.Contains(strings.ToLower(sub.InterfaceName), q) ||
+				strings.Contains(strings.ToLower(sub.GatewayIP.String()), q) ||
+				strings.Contains(fmt.Sprintf("%d", sub.VLANID), q)
+			if !matched {
+				for _, a := range sub.Allocations {
+					if strings.Contains(strings.ToLower(a.IP.String()), q) ||
+						strings.Contains(strings.ToLower(a.Hostname), q) ||
+						strings.Contains(strings.ToLower(a.MAC), q) {
+						matched = true
+						break
+					}
+				}
+			}
+			if matched {
+				subnets = append(subnets, sub)
+			}
+		}
+		if len(subnets) == 0 {
+			return theme.StyleCard.Width(width - 4).Render(
+				theme.StyleMuted.Render(fmt.Sprintf("No subnets matching search query: %s", data.Filter)),
+			)
+		}
+	} else {
+		subnets = data.Subnets
+	}
 	leftPaneWidth := width / 3
 	if leftPaneWidth < 30 {
 		leftPaneWidth = 30
@@ -39,7 +70,7 @@ func RenderIPAM(data IPAMData, width, height int) string {
 
 	leftHeader := theme.StyleTitle.Render("SUBNETS & VLANS") + "\n\n"
 	var leftRows []string
-	for i, sub := range data.Subnets {
+	for i, sub := range subnets {
 		cidrStr := sub.CIDR.String()
 		ifaceLabel := sub.InterfaceName
 		if sub.VLANID > 0 {
@@ -60,10 +91,10 @@ func RenderIPAM(data IPAMData, width, height int) string {
 	leftPane := lipgloss.NewStyle().Width(leftPaneWidth).Render(leftContent)
 
 	selIdx := data.SelectedIndex
-	if selIdx < 0 || selIdx >= len(data.Subnets) {
+	if selIdx < 0 || selIdx >= len(subnets) {
 		selIdx = 0
 	}
-	currentSub := data.Subnets[selIdx]
+	currentSub := subnets[selIdx]
 
 	statsTitle := theme.StyleTitle.Render("SUBNET DETAILS: " + currentSub.CIDR.String())
 	statsBody := fmt.Sprintf("%s %s    %s %s\n%s %s    %s %s\n%s %d    %s %d    %s %d    %s %5.1f%%",

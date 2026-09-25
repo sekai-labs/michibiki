@@ -13,6 +13,7 @@ type FirewallData struct {
 	Rules   []model.FirewallRule
 	NAT     []model.NATRule
 	Aliases []model.FirewallAlias
+	Filter  string
 	Error   error
 }
 
@@ -34,7 +35,11 @@ func RenderFirewall(data FirewallData, width, height int) string {
 	rulesHeaderRendered := theme.StyleTableHeader.Render(rulesHeader)
 
 	var ruleRows []string
+	q := strings.ToLower(data.Filter)
 	for i, r := range data.Rules {
+		if q != "" && !strings.Contains(strings.ToLower(r.Interface), q) && !strings.Contains(strings.ToLower(r.Protocol), q) && !strings.Contains(strings.ToLower(r.Source), q) && !strings.Contains(strings.ToLower(r.Destination), q) && !strings.Contains(strings.ToLower(r.Description), q) {
+			continue
+		}
 		actionBadge := theme.StyleBadgeOnline.Render("PASS")
 		if r.Action == model.FirewallBlock {
 			actionBadge = theme.StyleBadgeOffline.Render("BLOCK")

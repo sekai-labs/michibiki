@@ -11,6 +11,7 @@ import (
 type MonitorData struct {
 	Stats   []model.InterfaceStats
 	History map[string][]float64
+	Filter  string
 	Error   error
 }
 
@@ -64,7 +65,11 @@ func RenderMonitor(data MonitorData, width, height int) string {
 	headerRendered := theme.StyleTableHeader.Render(header)
 
 	var rows []string
+	q := strings.ToLower(data.Filter)
 	for i, s := range data.Stats {
+		if q != "" && !strings.Contains(strings.ToLower(s.InterfaceName), q) {
+			continue
+		}
 		rxRate := formatRate(s.RxBps)
 		txRate := formatRate(s.TxBps)
 		rxTotal := formatBytes(s.RxBytes)

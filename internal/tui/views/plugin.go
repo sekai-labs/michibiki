@@ -17,6 +17,7 @@ type PluginViewData struct {
 	SystemInfo   *model.SystemInfo
 	Interfaces   []model.Interface
 	Stats        []model.InterfaceStats
+	Filter       string
 }
 
 func RenderPluginCustomUI(data PluginViewData, width, height int) string {
@@ -61,10 +62,21 @@ func RenderPluginCustomUI(data PluginViewData, width, height int) string {
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, pluginCard, sysCard)
 
 	ifaceContent := fmt.Sprintf("%s\n\n", theme.StyleTitle.Render("DISCOVERED INTERFACES VIA PLUGIN"))
-	if len(data.Interfaces) == 0 {
+	ifaces := data.Interfaces
+	if data.Filter != "" {
+		q := strings.ToLower(data.Filter)
+		var matched []model.Interface
+		for _, iface := range ifaces {
+			if strings.Contains(strings.ToLower(iface.Name), q) || strings.Contains(strings.ToLower(iface.MACAddress), q) {
+				matched = append(matched, iface)
+			}
+		}
+		ifaces = matched
+	}
+	if len(ifaces) == 0 {
 		ifaceContent += theme.StyleMuted.Render("No active interfaces returned by plugin provider.")
 	} else {
-		for _, iface := range data.Interfaces {
+		for _, iface := range ifaces {
 			statusBadge := theme.StyleBadgeOffline.Render("DOWN")
 			if iface.OperStatus == model.OperStatusUp {
 				statusBadge = theme.StyleBadgeOnline.Render(" UP ")

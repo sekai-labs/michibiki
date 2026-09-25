@@ -11,6 +11,7 @@ import (
 type ConfigData struct {
 	RunningConfig string
 	SafetyStatus  string
+	Filter        string
 	Error         error
 }
 
@@ -43,6 +44,16 @@ func RenderConfig(data ConfigData, width, height int) string {
 		cfgBody = theme.StyleMuted.Render("Configuration empty or not retrievable from provider.")
 	} else {
 		lines := strings.Split(cfgBody, "\n")
+		if data.Filter != "" {
+			q := strings.ToLower(data.Filter)
+			var matched []string
+			for _, l := range lines {
+				if strings.Contains(strings.ToLower(l), q) {
+					matched = append(matched, l)
+				}
+			}
+			lines = matched
+		}
 		maxLines := height - 12
 		if maxLines > 0 && len(lines) > maxLines {
 			lines = lines[:maxLines]

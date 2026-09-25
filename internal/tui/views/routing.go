@@ -13,6 +13,7 @@ type RoutingData struct {
 	Routes    []model.Route
 	Gateways  []model.Gateway
 	Neighbors []model.BGPNeighbor
+	Filter    string
 	Error     error
 }
 
@@ -34,12 +35,15 @@ func RenderRouting(data RoutingData, width, height int) string {
 	gwHeaderRendered := theme.StyleTableHeader.Render(gwHeader)
 
 	var gwRows []string
+	q := strings.ToLower(data.Filter)
 	for i, gw := range data.Gateways {
+		if q != "" && !strings.Contains(strings.ToLower(gw.Name), q) && !strings.Contains(strings.ToLower(gw.Address), q) && !strings.Contains(strings.ToLower(gw.Interface), q) {
+			continue
+		}
 		badge := theme.StyleBadgeOnline.Render("ONLINE")
 		if gw.Status != model.GatewayOnline {
 			badge = theme.StyleBadgeOffline.Render(strings.ToUpper(string(gw.Status)))
 		}
-
 		defBadge := "-"
 		if gw.IsDefault {
 			defBadge = theme.StyleBadgeInfo.Render("YES")
@@ -72,6 +76,9 @@ func RenderRouting(data RoutingData, width, height int) string {
 
 	var routeRows []string
 	for i, r := range data.Routes {
+		if q != "" && !strings.Contains(strings.ToLower(r.Destination), q) && !strings.Contains(strings.ToLower(r.Gateway), q) && !strings.Contains(strings.ToLower(r.Interface), q) {
+			continue
+		}
 		gwStr := r.Gateway
 		if gwStr == "" {
 			gwStr = "*"

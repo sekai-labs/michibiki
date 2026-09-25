@@ -11,6 +11,7 @@ import (
 
 type DHCPData struct {
 	Leases []model.DHCPLease
+	Filter string
 	Error  error
 }
 
@@ -33,7 +34,11 @@ func RenderDHCP(data DHCPData, width, height int) string {
 
 	var rows []string
 	now := time.Now()
+	q := strings.ToLower(data.Filter)
 	for i, l := range data.Leases {
+		if q != "" && !strings.Contains(strings.ToLower(l.IPAddress), q) && !strings.Contains(strings.ToLower(l.MACAddress), q) && !strings.Contains(strings.ToLower(l.ClientHostname), q) && !strings.Contains(strings.ToLower(l.Interface), q) {
+			continue
+		}
 		stateBadge := theme.StyleBadgeOnline.Render("ACTIVE")
 		if l.State == model.DHCPStatic {
 			stateBadge = theme.StyleBadgeInfo.Render("STATIC")

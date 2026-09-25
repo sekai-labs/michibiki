@@ -446,6 +446,13 @@ func TestTUISearchFilter(t *testing.T) {
 	if currModel.FilterInput != "wan" {
 		t.Fatalf("expected FilterInput 'wan', got %q", currModel.FilterInput)
 	}
+	viewWithFilter := currModel.View()
+	if len(viewWithFilter) == 0 {
+		t.Fatalf("expected view to remain renderable during search filter")
+	}
+	if strings.Count(viewWithFilter, "\n") >= 41 {
+		t.Fatalf("expected view lines to not exceed terminal height 40, got %d", strings.Count(viewWithFilter, "\n"))
+	}
 
 	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	currModel = updated.(tui.Model)

@@ -38,10 +38,10 @@ const (
 )
 
 var subTabNames = []string{
-	"1 Overview",
-	"2 Live Traffic",
-	"3 IPAM Matrix",
-	"4 Running Config",
+	"Detail",
+	"[t] Traffic",
+	"[m] IPAM",
+	"[c] Config",
 }
 
 func (m Model) isPluginProvider() bool {
@@ -56,16 +56,30 @@ func (m Model) isPluginProvider() bool {
 }
 
 func (m Model) getSubTabNames() []string {
-	if m.isPluginProvider() {
-		return []string{
-			"1 Overview",
-			"2 Live Traffic",
-			"3 IPAM Matrix",
-			"4 Running Config",
-			"5 Plugin UI",
-		}
+	var inspectorTitle string
+	switch m.ActivePanel {
+	case 0:
+		inspectorTitle = "1 Status Detail"
+	case 1:
+		inspectorTitle = "2 Interfaces & VLANs"
+	case 2:
+		inspectorTitle = "3 Routes & Gateways"
+	case 3:
+		inspectorTitle = "4 Security & Services"
+	default:
+		inspectorTitle = "Detail"
 	}
-	return subTabNames
+
+	names := []string{
+		inspectorTitle,
+		"[t] Traffic",
+		"[m] IPAM",
+		"[c] Config",
+	}
+	if m.isPluginProvider() {
+		names = append(names, "[p] Plugin UI")
+	}
+	return names
 }
 
 type DataFetchedMsg struct {
@@ -712,23 +726,7 @@ func (m *Model) updateViewportDimensions() {
 func (m *Model) updateViewportContent() {
 	m.updateViewportDimensions()
 	raw := m.renderDetailContent()
-	if m.FilterInput == "" {
-		m.Viewport.SetContent(raw)
-		return
-	}
-
-	query := strings.ToLower(m.FilterInput)
-	lines := strings.Split(raw, "\n")
-	var filtered []string
-	for idx, line := range lines {
-		if idx < 2 || strings.Contains(strings.ToLower(line), query) {
-			filtered = append(filtered, line)
-		}
-	}
-	if len(filtered) <= 2 {
-		filtered = append(filtered, theme.StyleError.Render("  [No matches for search query: "+m.FilterInput+"]"))
-	}
-	m.Viewport.SetContent(strings.Join(filtered, "\n"))
+	m.Viewport.SetContent(raw)
 }
 
 func (m Model) View() string {
@@ -764,6 +762,11 @@ func (m Model) View() string {
 	}
 
 	rendered := lipgloss.JoinVertical(lipgloss.Left, header, mainArea, footer)
+	lines := strings.Split(rendered, "\n")
+	if len(lines) > m.Height && m.Height > 0 {
+		lines = lines[:m.Height]
+		rendered = strings.Join(lines, "\n")
+	}
 
 	if m.ShowHelpModal {
 		rendered = m.overlayHelpModal(rendered)
@@ -802,15 +805,15 @@ func (m Model) renderHeader() string {
 	}
 	gapStr := strings.Repeat(" ", gap)
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftHeader, gapStr, rightHeader)
+	res := lipgloss.JoinHorizontal(lipgloss.Top, leftHeader, gapStr, rightHeader)
+	return lipgloss.NewStyle().MaxWidth(m.Width).MaxHeight(1).Render(res)
 }
 
 func (m Model) renderFooter() string {
 	if m.FilterActive {
 		filterBar := StyleStatusKey.Render("FILTER: ") + m.FilterInput + " █ (esc/enter to finish)"
-		return StyleStatusBar.Width(m.Width).Render(filterBar)
+		return StyleStatusBar.Width(m.Width).MaxWidth(m.Width).MaxHeight(1).Render(filterBar)
 	}
-
 	var keys []string
 	keys = append(keys, StyleStatusKey.Render("1-4")+" panels/subtabs")
 	keys = append(keys, StyleStatusKey.Render("h/l")+" dock/detail")
@@ -834,7 +837,7 @@ func (m Model) renderFooter() string {
 		footerText += "  " + StyleProgressFilledWarn.Render("[FETCHING DATA...]")
 	}
 
-	return StyleStatusBar.Width(m.Width).Render(footerText)
+	return StyleStatusBar.Width(m.Width).MaxWidth(m.Width).MaxHeight(1).Render(footerText)
 }
 
 func (m Model) renderLeftDock(width, height int) string {
@@ -1189,6 +1192,7 @@ func (m Model) renderDetailContent() string {
 					SystemInfo:   m.LastFetched.SysInfo,
 					Interfaces:   m.LastFetched.Ifaces,
 					Stats:        m.LastFetched.Stats,
+					Filter:       m.FilterInput,
 				}, contentWidth, contentHeight)
 			}
 			return views.RenderDashboard(views.DashboardData{
@@ -1206,6 +1210,7 @@ func (m Model) renderDetailContent() string {
 				Interfaces:    m.LastFetched.Ifaces,
 				Stats:         statsMap,
 				SelectedIndex: m.SelectedIfaceIndex,
+				Filter:        m.FilterInput,
 				Error:         m.LastFetched.Err,
 			}, contentWidth, contentHeight)
 		case 2:
@@ -1213,16 +1218,19 @@ func (m Model) renderDetailContent() string {
 				Routes:    m.LastFetched.Routes,
 				Gateways:  m.LastFetched.Gateways,
 				Neighbors: m.LastFetched.BGP,
+				Filter:    m.FilterInput,
 				Error:     m.LastFetched.Err,
 			}, contentWidth, contentHeight)
 		case 3:
 			fw := views.RenderFirewall(views.FirewallData{
-				Rules: m.LastFetched.Firewall,
-				NAT:   m.LastFetched.NAT,
-				Error: m.LastFetched.Err,
+				Rules:  m.LastFetched.Firewall,
+				NAT:    m.LastFetched.NAT,
+				Filter: m.FilterInput,
+				Error:  m.LastFetched.Err,
 			}, contentWidth, contentHeight/2)
 			dhcp := views.RenderDHCP(views.DHCPData{
 				Leases: m.LastFetched.DHCP,
+				Filter: m.FilterInput,
 				Error:  m.LastFetched.Err,
 			}, contentWidth, contentHeight/2)
 			return lipgloss.JoinVertical(lipgloss.Left, fw, dhcp)
@@ -1239,6 +1247,7 @@ func (m Model) renderDetailContent() string {
 		return views.RenderMonitor(views.MonitorData{
 			Stats:   m.LastFetched.Stats,
 			History: m.TrafficHistory,
+			Filter:  m.FilterInput,
 			Error:   m.LastFetched.Err,
 		}, contentWidth, contentHeight)
 
@@ -1246,6 +1255,7 @@ func (m Model) renderDetailContent() string {
 		return views.RenderIPAM(views.IPAMData{
 			Subnets:       m.LastFetched.Subnets,
 			SelectedIndex: m.IPAMSelected,
+			Filter:        m.FilterInput,
 			Error:         m.LastFetched.Err,
 		}, contentWidth, contentHeight)
 
@@ -1253,6 +1263,7 @@ func (m Model) renderDetailContent() string {
 		return views.RenderConfig(views.ConfigData{
 			RunningConfig: m.LastFetched.Config,
 			SafetyStatus:  "Safety Engine Active — rollback tracking ready",
+			Filter:        m.FilterInput,
 			Error:         m.LastFetched.Err,
 		}, contentWidth, contentHeight)
 
@@ -1278,6 +1289,7 @@ func (m Model) renderDetailContent() string {
 			SystemInfo:   m.LastFetched.SysInfo,
 			Interfaces:   m.LastFetched.Ifaces,
 			Stats:        m.LastFetched.Stats,
+			Filter:       m.FilterInput,
 		}, contentWidth, contentHeight)
 	}
 	return ""
