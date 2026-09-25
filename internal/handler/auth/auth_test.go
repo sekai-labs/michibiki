@@ -49,6 +49,19 @@ func TestAuthHandler_ParseTokenFile(t *testing.T) {
 	if creds.Token != "json_secret_token" || creds.Username != "admin" {
 		t.Fatalf("unexpected json credentials: %+v", creds)
 	}
+
+	opnsenseFile := filepath.Join(tempDir, "opnsense_apikey.txt")
+	opnContent := "key=oW42JfTI50LPfki3abbnLmQVxYseY7A9zP8CrW6\nsecret=YwfzeAjqWAONzlE9vGq7zUvRFhEhPmkeBbeV4VK4\n"
+	if err := os.WriteFile(opnsenseFile, []byte(opnContent), 0600); err != nil {
+		t.Fatalf("failed to create opnsense file: %v", err)
+	}
+	creds, err = authHdlr.ParseTokenFile(opnsenseFile)
+	if err != nil {
+		t.Fatalf("ParseTokenFile failed for opnsense file: %v", err)
+	}
+	if creds.APIKey != "oW42JfTI50LPfki3abbnLmQVxYseY7A9zP8CrW6" || creds.APISecret != "YwfzeAjqWAONzlE9vGq7zUvRFhEhPmkeBbeV4VK4" {
+		t.Fatalf("unexpected opnsense credentials: %+v", creds)
+	}
 }
 
 func TestAuthHandler_EncryptedSessionLifecycle(t *testing.T) {

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
-
 	"github.com/sekai-labs/michibiki/internal/port"
 	"github.com/sekai-labs/michibiki/internal/handler/auth"
 	"github.com/sekai-labs/michibiki/internal/handler/network"
@@ -48,6 +48,17 @@ func (m *SessionHandler) ResolveAndConnect(
 	tokenFilePath string,
 	insecure bool,
 ) (port.ProviderPort, *config.DeviceProfile, error) {
+	return m.ResolveAndConnectWithProvider(ctx, deviceName, directURL, "", tokenFilePath, insecure)
+}
+
+func (m *SessionHandler) ResolveAndConnectWithProvider(
+	ctx context.Context,
+	deviceName string,
+	directURL string,
+	providerOverride string,
+	tokenFilePath string,
+	insecure bool,
+) (port.ProviderPort, *config.DeviceProfile, error) {
 	if m.cfg == nil {
 		return nil, nil, errors.New("configuration not loaded")
 	}
@@ -83,8 +94,24 @@ func (m *SessionHandler) ResolveAndConnect(
 		if profile.Name == "" {
 			profile.Name = "ephemeral"
 		}
+		if providerOverride != "" {
+			profile.Provider = providerOverride
+		} else if profile.Provider == "" && tokenFilePath != "" {
+			baseFile := strings.ToLower(filepath.Base(tokenFilePath))
+			if strings.Contains(baseFile, "opnsense") {
+				profile.Provider = "opnsense"
+			} else if strings.Contains(baseFile, "pfsense") {
+				profile.Provider = "pfsense"
+			} else if strings.Contains(baseFile, "routeros") {
+				profile.Provider = "routeros"
+			} else if strings.Contains(baseFile, "openwrt") {
+				profile.Provider = "openwrt"
+			} else if strings.Contains(baseFile, "vyos") {
+				profile.Provider = "vyos"
+			}
+		}
 		if profile.Provider == "" {
-			return nil, nil, errors.New("provider must be specified when using direct URL")
+			return nil, nil, errors.New("provider must be specified when using direct URL (use -p/--provider or configure device profile)")
 		}
 	}
 
@@ -142,7 +169,18 @@ func (m *SessionHandler) CreateNetworkHandler(
 	tokenFilePath string,
 	insecure bool,
 ) (*network.NetworkHandler, *config.DeviceProfile, error) {
-	prov, profile, err := m.ResolveAndConnect(ctx, deviceName, directURL, tokenFilePath, insecure)
+	return m.CreateNetworkHandlerWithProvider(ctx, deviceName, directURL, "", tokenFilePath, insecure)
+}
+
+func (m *SessionHandler) CreateNetworkHandlerWithProvider(
+	ctx context.Context,
+	deviceName string,
+	directURL string,
+	providerOverride string,
+	tokenFilePath string,
+	insecure bool,
+) (*network.NetworkHandler, *config.DeviceProfile, error) {
+	prov, profile, err := m.ResolveAndConnectWithProvider(ctx, deviceName, directURL, providerOverride, tokenFilePath, insecure)
 	if err != nil {
 		return nil, nil, err
 	}

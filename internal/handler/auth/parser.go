@@ -65,6 +65,41 @@ func (a *AuthHandler) ParseTokenFile(path string) (*credential.Credentials, erro
 		}
 	}
 
+	kvCreds := &credential.Credentials{}
+	hasKV := false
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.Contains(trimmed, "=") {
+			parts := strings.SplitN(trimmed, "=", 2)
+			k := strings.ToLower(strings.TrimSpace(parts[0]))
+			v := strings.TrimSpace(parts[1])
+			v = strings.Trim(v, `"'`)
+			switch k {
+			case "key", "api_key", "apikey":
+				kvCreds.APIKey = v
+				hasKV = true
+			case "secret", "api_secret", "apisecret":
+				kvCreds.APISecret = v
+				hasKV = true
+			case "token":
+				kvCreds.Token = v
+				hasKV = true
+			case "username", "user":
+				kvCreds.Username = v
+				hasKV = true
+			case "password", "pass":
+				kvCreds.Password = v
+				hasKV = true
+			}
+		}
+	}
+	if hasKV && (kvCreds.APIKey != "" || kvCreds.Token != "" || kvCreds.Username != "") {
+		return kvCreds, nil
+	}
+
 	lines := strings.Split(content, "\n")
 	firstLine := strings.TrimSpace(lines[0])
 	if strings.Contains(firstLine, ":") && !strings.Contains(firstLine, " ") {

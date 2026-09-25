@@ -45,18 +45,41 @@ func NewHTTPClient(opts HTTPOptions) *HTTPClient {
 		},
 	}
 
-	return &HTTPClient{
-		baseURL:   strings.TrimRight(opts.BaseURL, "/"),
+	baseURL := strings.TrimRight(opts.BaseURL, "/")
+	if baseURL != "" && !strings.HasPrefix(baseURL, "http:") && !strings.HasPrefix(baseURL, "https:") {
+		baseURL = "https:" + string([]byte{0x2f, 0x2f}) + baseURL
+	}
+
+	clientObj := &HTTPClient{
+		baseURL:   baseURL,
 		username:  opts.Username,
 		password:  opts.Password,
 		apiKey:    opts.APIKey,
 		apiSecret: opts.APISecret,
 		token:     opts.Token,
-		httpClient: &http.Client{
-			Timeout:   timeout,
-			Transport: transport,
+	}
+
+	clientObj.httpClient = &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("stopped after 10 redirects")
+			}
+			if len(via) > 0 {
+				if clientObj.apiKey != "" && clientObj.apiSecret != "" {
+					req.SetBasicAuth(clientObj.apiKey, clientObj.apiSecret)
+				} else if clientObj.username != "" || clientObj.password != "" {
+					req.SetBasicAuth(clientObj.username, clientObj.password)
+				} else if clientObj.token != "" {
+					req.Header.Set("Authorization", "Bearer "+clientObj.token)
+				}
+			}
+			return nil
 		},
 	}
+
+	return clientObj
 }
 
 func (c *HTTPClient) Do(ctx context.Context, method, path string, body any, target any) error {
@@ -125,9 +148,12 @@ func (c *HTTPClient) Do(ctx context.Context, method, path string, body any, targ
 			}
 			snippet = strings.ReplaceAll(snippet, "\n", " ")
 			snippet = strings.ReplaceAll(snippet, "\r", "")
+			lowerTrimmed := strings.ToLower(string(trimmed))
+			if strings.Contains(lowerTrimmed, "no-js") || strings.Contains(lowerTrimmed, "login") || strings.Contains(lowerTrimmed, "password") {
+				return fmt.Errorf("endpoint returned web GUI login page instead of API response (authentication failed or credentials missing: use -f with API key file or check URL): %s", snippet)
+			}
 			return fmt.Errorf("endpoint returned HTML/non-JSON response (check URL, credentials, or API path): %s", snippet)
 		}
-
 		if err := json.Unmarshal(respBytes, target); err != nil {
 			snippet := string(trimmed)
 			if len(snippet) > 100 {

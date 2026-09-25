@@ -20,6 +20,7 @@ import (
 var (
 	flagDevice   string
 	flagURL      string
+	flagProvider string
 	flagOutput   string
 	flagInsecure bool
 	flagConfig    string
@@ -40,6 +41,7 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&flagDevice, "device", "d", "", "Device profile name")
 	rootCmd.PersistentFlags().StringVarP(&flagURL, "url", "u", "", "Direct device URL or address")
+	rootCmd.PersistentFlags().StringVarP(&flagProvider, "provider", "p", "", "Provider name for direct URL (opnsense, pfsense, routeros, openwrt, vyos, frr)")
 	rootCmd.PersistentFlags().StringVarP(&flagOutput, "output", "o", "table", "Output format (table, json, yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&flagInsecure, "insecure", "k", false, "TLS insecure skip verify")
 	rootCmd.PersistentFlags().StringVar(&flagConfig, "config", "", "Custom configuration file path")
@@ -98,7 +100,7 @@ func resolveProvider(cmd *cobra.Command) (provider.Provider, *config.DeviceProfi
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	prov, profile, err := sm.ResolveAndConnect(ctx, flagDevice, flagURL, flagTokenFile, flagInsecure)
+	prov, profile, err := sm.ResolveAndConnectWithProvider(ctx, flagDevice, flagURL, flagProvider, flagTokenFile, flagInsecure)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -114,9 +116,8 @@ func resolveNetworkHandler(cmd *cobra.Command) (*network.NetworkHandler, *config
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return sm.CreateNetworkHandler(ctx, flagDevice, flagURL, flagTokenFile, flagInsecure)
+	return sm.CreateNetworkHandlerWithProvider(ctx, flagDevice, flagURL, flagProvider, flagTokenFile, flagInsecure)
 }
-
 func resolveNetworkService(cmd *cobra.Command) (*network.NetworkHandler, *config.DeviceProfile, error) {
 	return resolveNetworkHandler(cmd)
 }
