@@ -162,14 +162,15 @@ func (p *Provider) ListInterfaces(ctx context.Context) ([]model.Interface, error
 		return nil, err
 	}
 
-	var rawInterfaces map[string]map[string]any
+	var rawInterfaces map[string]any
 	err = c.Do(ctx, "GET", "/api/interfaces/overview/interfacesInfo", nil, &rawInterfaces)
 	if err != nil {
 		return nil, err
 	}
 
 	var list []model.Interface
-	for name, data := range rawInterfaces {
+
+	parseIface := func(name string, data map[string]any) model.Interface {
 		iface := model.Interface{
 			ID:          name,
 			Name:        name,
@@ -210,12 +211,34 @@ func (p *Provider) ListInterfaces(ctx context.Context) ([]model.Interface, error
 				}
 			}
 		}
-
-		list = append(list, iface)
+		return iface
 	}
 
+	if rows, ok := rawInterfaces["rows"].([]any); ok {
+		for _, r := range rows {
+			if data, ok := r.(map[string]any); ok {
+				name := fmt.Sprintf("%v", data["identifier"])
+				if name == "" || name == "<nil>" {
+					name = fmt.Sprintf("%v", data["name"])
+				}
+				if name != "" && name != "<nil>" {
+					list = append(list, parseIface(name, data))
+				}
+			}
+		}
+		return list, nil
+	}
+
+	for name, val := range rawInterfaces {
+		data, ok := val.(map[string]any)
+		if !ok {
+			continue
+		}
+		list = append(list, parseIface(name, data))
+	}
 	return list, nil
 }
+
 
 func (p *Provider) GetInterface(ctx context.Context, name string) (*model.Interface, error) {
 	ifaces, err := p.ListInterfaces(ctx)
@@ -466,7 +489,7 @@ func (p *Provider) GetInterfaceStats(ctx context.Context) ([]model.InterfaceStat
 		return nil, err
 	}
 
-	var rawStats map[string]map[string]any
+	var rawStats map[string]any
 	err = c.Do(ctx, "GET", "/api/diagnostics/interface/getInterfaceStatistics", nil, &rawStats)
 	if err != nil {
 		return []model.InterfaceStats{}, nil
@@ -474,7 +497,11 @@ func (p *Provider) GetInterfaceStats(ctx context.Context) ([]model.InterfaceStat
 
 	var stats []model.InterfaceStats
 	now := time.Now()
-	for name, m := range rawStats {
+	for name, val := range rawStats {
+		m, ok := val.(map[string]any)
+		if !ok {
+			continue
+		}
 		s := model.InterfaceStats{
 			InterfaceName: name,
 			Timestamp:     now,
