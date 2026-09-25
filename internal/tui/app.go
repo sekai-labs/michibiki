@@ -446,6 +446,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "k", "up":
 			if m.FocusedPane == PaneDock {
 				m.moveCursor(-1)
+			} else if SubTab(m.DetailSubTab) == SubTabIPAMMatrix {
+				if m.IPAMSelected > 0 {
+					m.IPAMSelected--
+				}
+			} else if SubTab(m.DetailSubTab) == SubTabOverview && m.ActivePanel == 1 {
+				m.moveCursor(-1)
 			} else {
 				m.Viewport.LineUp(1)
 			}
@@ -454,6 +460,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "j", "down":
 			if m.FocusedPane == PaneDock {
+				m.moveCursor(1)
+			} else if SubTab(m.DetailSubTab) == SubTabIPAMMatrix {
+				if count := len(m.LastFetched.Subnets); count > 0 && m.IPAMSelected < count-1 {
+					m.IPAMSelected++
+				}
+			} else if SubTab(m.DetailSubTab) == SubTabOverview && m.ActivePanel == 1 {
 				m.moveCursor(1)
 			} else {
 				m.Viewport.LineDown(1)
@@ -464,6 +476,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "g":
 			if m.FocusedPane == PaneDock {
 				m.cursorToTop()
+			} else if SubTab(m.DetailSubTab) == SubTabIPAMMatrix {
+				m.IPAMSelected = 0
 			} else {
 				m.Viewport.GotoTop()
 			}
@@ -473,6 +487,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "G":
 			if m.FocusedPane == PaneDock {
 				m.cursorToBottom()
+			} else if SubTab(m.DetailSubTab) == SubTabIPAMMatrix {
+				if count := len(m.LastFetched.Subnets); count > 0 {
+					m.IPAMSelected = count - 1
+				}
 			} else {
 				m.Viewport.GotoBottom()
 			}
@@ -1185,9 +1203,10 @@ func (m Model) renderDetailContent() string {
 				statsMap[s.InterfaceName] = s
 			}
 			return views.RenderInterfaces(views.InterfacesData{
-				Interfaces: m.LastFetched.Ifaces,
-				Stats:      statsMap,
-				Error:      m.LastFetched.Err,
+				Interfaces:    m.LastFetched.Ifaces,
+				Stats:         statsMap,
+				SelectedIndex: m.SelectedIfaceIndex,
+				Error:         m.LastFetched.Err,
 			}, contentWidth, contentHeight)
 		case 2:
 			return views.RenderRouting(views.RoutingData{

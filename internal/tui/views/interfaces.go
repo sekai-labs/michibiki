@@ -9,9 +9,10 @@ import (
 )
 
 type InterfacesData struct {
-	Interfaces []model.Interface
-	Stats      map[string]model.InterfaceStats
-	Error      error
+	Interfaces    []model.Interface
+	Stats         map[string]model.InterfaceStats
+	SelectedIndex int
+	Error         error
 }
 
 func RenderInterfaces(data InterfacesData, width, height int) string {
@@ -83,7 +84,9 @@ func RenderInterfaces(data InterfacesData, width, height int) string {
 			txBytesStr,
 		)
 
-		if i%2 == 0 {
+		if i == data.SelectedIndex {
+			rows = append(rows, theme.StyleDockSelected.Render(line))
+		} else if i%2 == 0 {
 			rows = append(rows, theme.StyleTableRow.Render(line))
 		} else {
 			rows = append(rows, theme.StyleTableRowAlt.Render(line))

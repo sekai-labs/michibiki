@@ -196,6 +196,16 @@ func (d *dummyProvider) GetSubnetUsage(ctx context.Context, filter string) ([]ip
 				},
 			},
 		},
+		{
+			CIDR:           netip.MustParsePrefix("10.0.0.0/24"),
+			InterfaceName:  "vtnet1",
+			GatewayIP:      netip.MustParseAddr("10.0.0.1"),
+			TotalIPs:       256,
+			UsableIPs:      254,
+			UsedIPs:        5,
+			FreeIPs:        249,
+			UtilizationPct: 2.0,
+		},
 	}, nil
 }
 func (d *dummyProvider) GetRunningConfig(ctx context.Context) (string, error) {
@@ -634,5 +644,33 @@ func TestTUIPluginCustomUI(t *testing.T) {
 	currModel = updated.(tui.Model)
 	if currModel.DetailSubTab != 4 {
 		t.Fatalf("expected DetailSubTab 4 on '5' while in PaneDetail, got %d", currModel.DetailSubTab)
+	}
+}
+
+func TestTUIIPAMSubnetNavigation(t *testing.T) {
+	prov := &dummyProvider{}
+	m := tui.NewModel(prov, "test-box")
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	currModel := updated.(tui.Model)
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("i")})
+	currModel = updated.(tui.Model)
+	if currModel.FocusedPane != tui.PaneDetail {
+		t.Fatalf("expected FocusedPane PaneDetail on 'i', got %v", currModel.FocusedPane)
+	}
+	if currModel.DetailSubTab != 2 {
+		t.Fatalf("expected DetailSubTab 2, got %d", currModel.DetailSubTab)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	currModel = updated.(tui.Model)
+	if len(currModel.LastFetched.Subnets) > 1 && currModel.IPAMSelected != 1 {
+		t.Fatalf("expected IPAMSelected to advance to 1 on 'j', got %d", currModel.IPAMSelected)
+	}
+
+	updated, _ = currModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	currModel = updated.(tui.Model)
+	if currModel.IPAMSelected != 0 {
+		t.Fatalf("expected IPAMSelected to return to 0 on 'k', got %d", currModel.IPAMSelected)
 	}
 }
