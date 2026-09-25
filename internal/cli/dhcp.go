@@ -23,17 +23,17 @@ var dhcpLeaseListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all active and static DHCP leases",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		leases, err := prov.ListDHCPLeases(cmd.Context())
+		overview, err := svc.GetServicesOverview(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list DHCP leases: %w", err)
 		}
-
+		leases := overview.DHCPLeases
 		return formatOutput(cmd, leases, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintf(w, "IP ADDRESS\tMAC ADDRESS\tHOSTNAME\tSTATE\tINTERFACE\tEXPIRES\n")

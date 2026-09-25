@@ -18,17 +18,17 @@ var routeListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all routes",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		routes, err := prov.ListRoutes(cmd.Context())
+		overview, err := svc.GetRoutingOverview(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list routes: %w", err)
 		}
-
+		routes := overview.Routes
 		return formatOutput(cmd, routes, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintf(w, "DESTINATION\tGATEWAY\tINTERFACE\tPROTOCOL\tMETRIC\tSCOPE\n")
@@ -69,17 +69,17 @@ var gatewayListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all network gateways",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		gws, err := prov.ListGateways(cmd.Context())
+		overview, err := svc.GetRoutingOverview(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list gateways: %w", err)
 		}
-
+		gws := overview.Gateways
 		return formatOutput(cmd, gws, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintf(w, "NAME\tADDRESS\tINTERFACE\tSTATUS\tDEFAULT\tLATENCY\tLOSS\n")

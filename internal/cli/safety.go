@@ -26,17 +26,17 @@ var configShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Show the current running configuration of the connected device",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		cfg, err := prov.GetRunningConfig(cmd.Context())
+		cfgState, err := svc.GetConfigState(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to retrieve running config: %w", err)
 		}
-
+		cfg := cfgState.RunningConfig
 		return formatOutput(cmd, map[string]string{"configuration": cfg}, func() {
 			fmt.Println(cfg)
 		})

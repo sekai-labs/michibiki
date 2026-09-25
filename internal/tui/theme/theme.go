@@ -1,24 +1,29 @@
 package theme
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 var (
-	ColorEmerald   = lipgloss.Color("#10B981")
-	ColorCrimson   = lipgloss.Color("#EF4444")
-	ColorAmber     = lipgloss.Color("#F59E0B")
-	ColorCyan      = lipgloss.Color("#06B6D4")
-	ColorPurple    = lipgloss.Color("#8B5CF6")
-	ColorGray      = lipgloss.Color("#6B7280")
-	ColorDarkGray  = lipgloss.Color("#374151")
-	ColorLightGray = lipgloss.Color("#D1D5DB")
-	ColorWhite     = lipgloss.Color("#F9FAFB")
-	ColorBg        = lipgloss.Color("#111827")
-	ColorCardBg    = lipgloss.Color("#1F2937")
+	ColorEmerald   = lipgloss.Color("#73daca")
+	ColorCrimson   = lipgloss.Color("#f7768e")
+	ColorAmber     = lipgloss.Color("#e0af68")
+	ColorCyan      = lipgloss.Color("#7dcfff")
+	ColorPurple    = lipgloss.Color("#bb9af7")
+	ColorGray      = lipgloss.Color("#565f89")
+	ColorDarkGray  = lipgloss.Color("#24283b")
+	ColorLightGray = lipgloss.Color("#c0caf5")
+	ColorWhite     = lipgloss.Color("#ffffff")
+	ColorBg        = lipgloss.Color("#1a1b26")
+	ColorCardBg    = lipgloss.Color("#1f2335")
+	ColorAccent    = lipgloss.Color("#7aa2f7")
 
 	StyleHeader = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorWhite).
-			Background(ColorPurple).
+			Foreground(ColorBg).
+			Background(ColorAccent).
 			Padding(0, 1)
 
 	StyleHeaderSub = lipgloss.NewStyle().
@@ -28,32 +33,32 @@ var (
 
 	StyleBadgeOnline = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("#064E3B")).
+				Foreground(ColorBg).
 				Background(ColorEmerald).
 				Padding(0, 1)
 
 	StyleBadgeOffline = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("#7F1D1D")).
+				Foreground(ColorWhite).
 				Background(ColorCrimson).
 				Padding(0, 1)
 
 	StyleBadgeWarning = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("#78350F")).
+				Foreground(ColorBg).
 				Background(ColorAmber).
 				Padding(0, 1)
 
 	StyleBadgeInfo = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#164E63")).
+			Foreground(ColorBg).
 			Background(ColorCyan).
 			Padding(0, 1)
 
 	StyleTabActive = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorWhite).
-			Background(ColorPurple).
+			Foreground(ColorBg).
+			Background(ColorAccent).
 			Padding(0, 1)
 
 	StyleTabInactive = lipgloss.NewStyle().
@@ -68,7 +73,7 @@ var (
 
 	StyleCardActive = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorCyan).
+			BorderForeground(ColorAccent).
 			Padding(0, 1)
 
 	StyleCardAlert = lipgloss.NewStyle().
@@ -86,7 +91,7 @@ var (
 
 	StyleTableHeader = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(ColorCyan).
+				Foreground(ColorAccent).
 				Border(lipgloss.NormalBorder(), false, false, true, false).
 				BorderForeground(ColorDarkGray)
 
@@ -129,6 +134,32 @@ var (
 	StyleError = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(ColorCrimson)
+
+	StyleDockSelected = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(ColorWhite).
+				Background(ColorDarkGray)
+
+	StyleSubTabActive = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(ColorBg).
+				Background(ColorAccent).
+				Padding(0, 1)
+
+	StyleSubTabInactive = lipgloss.NewStyle().
+				Foreground(ColorLightGray).
+				Background(ColorDarkGray).
+				Padding(0, 1)
+
+	StyleCursor = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(ColorAccent)
+
+	StyleModal = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(ColorAccent).
+			Background(ColorBg).
+			Padding(1, 2)
 )
 
 func RenderProgressBar(pct float64, width int) string {
@@ -148,14 +179,8 @@ func RenderProgressBar(pct float64, width int) string {
 	}
 	emptyLen := width - filledLen
 
-	filledStr := ""
-	for i := 0; i < filledLen; i++ {
-		filledStr += "█"
-	}
-	emptyStr := ""
-	for i := 0; i < emptyLen; i++ {
-		emptyStr += "░"
-	}
+	filledStr := strings.Repeat("█", filledLen)
+	emptyStr := strings.Repeat("░", emptyLen)
 
 	filledStyle := StyleProgressFilled
 	if pct >= 90 {

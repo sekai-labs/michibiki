@@ -19,17 +19,17 @@ var vpnPeersCmd = &cobra.Command{
 	Use:   "peers",
 	Short: "List WireGuard peers and tunnel status",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		peers, err := prov.ListWireGuardPeers(cmd.Context())
+		overview, err := svc.GetServicesOverview(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list WireGuard peers: %w", err)
 		}
-
+		peers := overview.WireGuardPeers
 		return formatOutput(cmd, peers, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintf(w, "PUBLIC KEY\tENDPOINT\tALLOWED IPS\tLATEST HANDSHAKE\tRX\tTX\n")

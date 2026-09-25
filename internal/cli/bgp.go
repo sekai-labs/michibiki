@@ -23,17 +23,17 @@ var bgpNeighborListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all BGP peers and neighbor sessions",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		neighbors, err := prov.ListBGPNeighbors(cmd.Context())
+		overview, err := svc.GetRoutingOverview(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list BGP neighbors: %w", err)
 		}
-
+		neighbors := overview.BGPNeighbors
 		return formatOutput(cmd, neighbors, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintf(w, "PEER ADDRESS\tREMOTE AS\tLOCAL AS\tSTATE\tUPTIME\tRCVD\tACCEPTED\tDESCRIPTION\n")

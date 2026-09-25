@@ -18,17 +18,17 @@ var systemInfoCmd = &cobra.Command{
 	Use:   "info",
 	Short: "Display system overview and hardware resources",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, profile, err := resolveProvider(cmd)
+		svc, profile, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		info, err := prov.GetSystemInfo(cmd.Context())
+		overview, err := svc.GetDeviceOverview(cmd.Context())
 		if err != nil {
-			return fmt.Errorf("failed to retrieve system info: %w", err)
+			return fmt.Errorf("failed to retrieve system overview: %w", err)
 		}
-
+		info := overview.SystemInfo
 		return formatOutput(cmd, info, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintf(w, "PROPERTY\tVALUE\n")

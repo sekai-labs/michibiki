@@ -5,17 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/netip"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
-
+	"github.com/sekai-labs/michibiki/internal/handler/auth"
+	"github.com/sekai-labs/michibiki/internal/handler/network"
+	"github.com/sekai-labs/michibiki/internal/handler/session"
 	"github.com/sekai-labs/michibiki/pkg/config"
-	"github.com/sekai-labs/michibiki/pkg/credential"
-	"github.com/sekai-labs/michibiki/pkg/plugin"
 	"github.com/sekai-labs/michibiki/pkg/provider"
 )
 
@@ -24,8 +22,9 @@ var (
 	flagURL      string
 	flagOutput   string
 	flagInsecure bool
-	flagConfig   string
-	flagNoColor  bool
+	flagConfig    string
+	flagNoColor   bool
+	flagTokenFile string
 )
 
 var rootCmd = &cobra.Command{
@@ -45,7 +44,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&flagInsecure, "insecure", "k", false, "TLS insecure skip verify")
 	rootCmd.PersistentFlags().StringVar(&flagConfig, "config", "", "Custom configuration file path")
 	rootCmd.PersistentFlags().BoolVar(&flagNoColor, "no-color", false, "Disable ANSI color escapes")
-
+	rootCmd.PersistentFlags().StringVarP(&flagTokenFile, "token-file", "f", "", "Path to token file (raw token, key:secret, or JSON credentials)")
 	rootCmd.AddCommand(systemCmd)
 	rootCmd.AddCommand(interfaceCmd)
 	rootCmd.AddCommand(routeCmd)
@@ -60,6 +59,7 @@ func init() {
 	rootCmd.AddCommand(ipCmd)
 	rootCmd.AddCommand(deviceCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(authCmd)
 	rootCmd.AddCommand(pluginCmd)
 	rootCmd.AddCommand(tuiCmd)
 }
@@ -81,100 +81,44 @@ func loadAppConfig() (*config.Config, error) {
 	return cfg, nil
 }
 
-func resolveProvider(cmd *cobra.Command) (provider.Provider, *config.DeviceProfile, error) {
+func getSessionHandler() (*session.SessionHandler, error) {
 	cfg, err := loadAppConfig()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load configuration: %w", err)
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
+	return session.NewSessionHandler(cfg, auth.NewAuthHandler()), nil
+}
 
-	var pluginDirs []string
-	if cfg.PluginDir != "" {
-		pluginDirs = append(pluginDirs, cfg.PluginDir)
-	}
-	if envPluginDir := os.Getenv("MICHIBIKI_PLUGIN_DIR"); envPluginDir != "" {
-		pluginDirs = append(pluginDirs, envPluginDir)
-	}
-	discovered, _ := plugin.DiscoverPlugins(pluginDirs)
-	if len(discovered) > 0 {
-		plugin.RegisterDiscoveredPlugins(discovered)
-	}
-
-	deviceName := flagDevice
-	if deviceName == "" && flagURL == "" {
-		deviceName = cfg.DefaultDevice
-	}
-
-	var profile config.DeviceProfile
-	if deviceName != "" {
-		p, err := cfg.GetDevice(deviceName)
-		if err == nil {
-			profile = *p
-		} else if flagURL == "" {
-			return nil, nil, fmt.Errorf("device profile '%s' not found: %w", deviceName, err)
-		}
-	}
-
-	if flagURL != "" {
-		profile.Address = flagURL
-		if profile.Name == "" {
-			profile.Name = "ephemeral"
-		}
-		if profile.Provider == "" {
-			return nil, nil, errors.New("provider must be specified when using direct URL")
-		}
-	}
-
-	if flagInsecure {
-		profile.Insecure = true
-	}
-
-	if profile.Provider == "" {
-		return nil, nil, errors.New("no provider configured for device")
-	}
-
-	prov, err := provider.Create(profile.Provider)
+func resolveProvider(cmd *cobra.Command) (provider.Provider, *config.DeviceProfile, error) {
+	sm, err := getSessionHandler()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create provider '%s': %w", profile.Provider, err)
+		return nil, nil, err
 	}
-
-	var vault *credential.VaultStore
-	vaultPass := os.Getenv("MICHIBIKI_VAULT_PASSPHRASE")
-	if vaultPass != "" {
-		vault = credential.NewVaultStore(config.DefaultVaultPath(), vaultPass)
-	}
-	resolver := credential.NewResolver(vault)
-
-	creds, err := resolver.Resolve(profile.CredentialRef, profile.Name)
-	if err != nil {
-		creds = &credential.Credentials{}
-	}
-
-	options := make(map[string]string)
-	for k, v := range profile.Options {
-		options[k] = v
-	}
-	if profile.Insecure {
-		options["insecure"] = "true"
-	}
-	if profile.Port > 0 {
-		options["port"] = strconv.Itoa(profile.Port)
-	}
-
 	ctx := cmd.Context()
 	if ctx == nil {
 		ctx = context.Background()
 	}
-
-	endpoint := profile.Address
-	if profile.Port > 0 && !strings.Contains(endpoint, ":") {
-		endpoint = netip.AddrPortFrom(netip.MustParseAddr(profile.Address), uint16(profile.Port)).String()
+	prov, profile, err := sm.ResolveAndConnect(ctx, flagDevice, flagURL, flagTokenFile, flagInsecure)
+	if err != nil {
+		return nil, nil, err
 	}
+	return prov.(provider.Provider), profile, nil
+}
 
-	if err := prov.Connect(ctx, endpoint, creds, options); err != nil {
-		return nil, nil, fmt.Errorf("connection to '%s' failed: %w", profile.Name, err)
+func resolveNetworkHandler(cmd *cobra.Command) (*network.NetworkHandler, *config.DeviceProfile, error) {
+	sm, err := getSessionHandler()
+	if err != nil {
+		return nil, nil, err
 	}
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return sm.CreateNetworkHandler(ctx, flagDevice, flagURL, flagTokenFile, flagInsecure)
+}
 
-	return prov, &profile, nil
+func resolveNetworkService(cmd *cobra.Command) (*network.NetworkHandler, *config.DeviceProfile, error) {
+	return resolveNetworkHandler(cmd)
 }
 
 func formatOutput(cmd *cobra.Command, data any, printTable func()) error {

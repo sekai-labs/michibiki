@@ -6,6 +6,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/sekai-labs/michibiki/pkg/model"
 	"github.com/spf13/cobra"
 )
 
@@ -19,15 +20,20 @@ var interfaceListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all network interfaces",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		ifaces, err := prov.ListInterfaces(cmd.Context())
+		items, err := svc.ListInterfacesWithStats(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list interfaces: %w", err)
+		}
+
+		ifaces := make([]model.Interface, len(items))
+		for i, item := range items {
+			ifaces[i] = item.Interface
 		}
 
 		return formatOutput(cmd, ifaces, func() {

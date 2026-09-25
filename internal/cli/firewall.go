@@ -24,17 +24,17 @@ var firewallRuleListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all firewall filter rules",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		rules, err := prov.ListFirewallRules(cmd.Context())
+		overview, err := svc.GetSecurityOverview(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list firewall rules: %w", err)
 		}
-
+		rules := overview.FirewallRules
 		return formatOutput(cmd, rules, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintf(w, "SEQ\tIFACE\tDIR\tACTION\tPROTO\tSOURCE\tPORT\tDESTINATION\tPORT\tPACKETS\tBYTES\tDESCRIPTION\n")
@@ -96,17 +96,17 @@ var firewallAliasListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all firewall aliases",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		aliases, err := prov.ListFirewallAliases(cmd.Context())
+		overview, err := svc.GetSecurityOverview(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list firewall aliases: %w", err)
 		}
-
+		aliases := overview.Aliases
 		return formatOutput(cmd, aliases, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintf(w, "NAME\tTYPE\tCONTENT\tDESCRIPTION\n")
@@ -137,17 +137,17 @@ var natListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all NAT rules",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
-		nats, err := prov.ListNATRules(cmd.Context())
+		overview, err := svc.GetSecurityOverview(cmd.Context())
 		if err != nil {
 			return fmt.Errorf("failed to list NAT rules: %w", err)
 		}
-
+		nats := overview.NATRules
 		return formatOutput(cmd, nats, func() {
 			w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintf(w, "ID\tTYPE\tIFACE\tPROTO\tSOURCE\tDESTINATION\tTARGET\tTARGET PORT\tENABLED\n")

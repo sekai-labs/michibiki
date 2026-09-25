@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/sekai-labs/michibiki/pkg/config"
@@ -90,5 +92,37 @@ func TestConfigDeviceLookup(t *testing.T) {
 	}
 	if dev.Provider != "opnsense" {
 		t.Errorf("expected provider opnsense, got %s", dev.Provider)
+	}
+}
+
+func TestAuthTokenCLICommands(t *testing.T) {
+	tempDir := t.TempDir()
+	tokenFile := filepath.Join(tempDir, "test_token.txt")
+	if err := os.WriteFile(tokenFile, []byte("tok_sample_test_credential_9999\n"), 0600); err != nil {
+		t.Fatalf("failed to write test token file: %v", err)
+	}
+	rootCmd.SetArgs([]string{"auth", "token", "--help"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("auth token --help failed: %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"auth", "token", "import", "-f", tokenFile, "--device", "router-01"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("auth token import failed: %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"auth", "token", "status"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("auth token status failed: %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"auth", "token", "clear"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("auth token clear failed: %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"auth", "token", "status"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("auth token status failed after clear: %v", err)
 	}
 }

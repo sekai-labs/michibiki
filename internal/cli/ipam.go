@@ -27,18 +27,18 @@ var ipUsageCmd = &cobra.Command{
 	Use:   "usage [interface|vlan|cidr]",
 	Short: "Display subnet allocation matrix, utilization progress, and used IPs",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		prov, _, err := resolveProvider(cmd)
+		svc, _, err := resolveNetworkService(cmd)
 		if err != nil {
 			return err
 		}
-		defer prov.Disconnect(cmd.Context())
+		defer svc.Provider().Disconnect(cmd.Context())
 
 		query := ""
 		if len(args) > 0 {
 			query = args[0]
 		}
 
-		usages, err := prov.GetSubnetUsage(cmd.Context(), query)
+		usages, err := svc.GetIPAMAllocation(cmd.Context(), query)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve subnet usage: %w", err)
 		}

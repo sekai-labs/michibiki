@@ -43,8 +43,12 @@ var (
 	StyleFreeIP               = theme.StyleFreeIP
 	StyleMuted                = theme.StyleMuted
 	StyleError                = theme.StyleError
+	StyleDockSelected   = theme.StyleDockSelected
+	StyleSubTabActive   = theme.StyleSubTabActive
+	StyleSubTabInactive = theme.StyleSubTabInactive
+	StyleCursor         = theme.StyleCursor
+	StyleModal          = theme.StyleModal
 )
-
 func RenderProgressBar(pct float64, width int) string {
 	return theme.RenderProgressBar(pct, width)
 }
