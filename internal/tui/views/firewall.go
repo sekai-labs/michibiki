@@ -47,10 +47,13 @@ func RenderFirewall(data FirewallData, width, height int) string {
 			actionBadge = theme.StyleBadgeWarning.Render("REJECT")
 		}
 
-		src := r.Source
+		var srcB strings.Builder
+		srcB.WriteString(r.Source)
 		if r.SourcePort != "" {
-			src += ":" + r.SourcePort
+			srcB.WriteByte(':')
+			srcB.WriteString(r.SourcePort)
 		}
+		src := srcB.String()
 		if src == "" {
 			src = "any"
 		}
@@ -58,10 +61,13 @@ func RenderFirewall(data FirewallData, width, height int) string {
 			src = src[:15] + "..."
 		}
 
-		dst := r.Destination
+		var dstB strings.Builder
+		dstB.WriteString(r.Destination)
 		if r.DestinationPort != "" {
-			dst += ":" + r.DestinationPort
+			dstB.WriteByte(':')
+			dstB.WriteString(r.DestinationPort)
 		}
+		dst := dstB.String()
 		if dst == "" {
 			dst = "any"
 		}
@@ -95,8 +101,18 @@ func RenderFirewall(data FirewallData, width, height int) string {
 	if len(ruleRows) == 0 {
 		ruleRows = append(ruleRows, theme.StyleMuted.Render("No firewall filter rules found."))
 	}
-	rulesCard := theme.StyleCard.Width(cardWidth).Render(rulesTitle + "\n\n" + rulesHeaderRendered + "\n" + strings.Join(ruleRows, "\n"))
-
+	var rb strings.Builder
+	rb.WriteString(rulesTitle)
+	rb.WriteString("\n\n")
+	rb.WriteString(rulesHeaderRendered)
+	rb.WriteByte('\n')
+	for i, r := range ruleRows {
+		if i > 0 {
+			rb.WriteByte('\n')
+		}
+		rb.WriteString(r)
+	}
+	rulesCard := theme.StyleCard.Width(cardWidth).Render(rb.String())
 	var natCard string
 	if len(data.NAT) > 0 {
 		natTitle := theme.StyleTitle.Render(fmt.Sprintf("NAT RULES (%d RULES)", len(data.NAT)))
@@ -111,10 +127,13 @@ func RenderFirewall(data FirewallData, width, height int) string {
 				statusBadge = theme.StyleBadgeOffline.Render("OFF")
 			}
 
-			targetStr := n.Target
+			var targetB strings.Builder
+			targetB.WriteString(n.Target)
 			if n.TargetPort != "" {
-				targetStr += ":" + n.TargetPort
+				targetB.WriteByte(':')
+				targetB.WriteString(n.TargetPort)
 			}
+			targetStr := targetB.String()
 
 			line := fmt.Sprintf("%-10s %-8s %-6s %-18s %-18s %-18s %-8s",
 				n.Type,
@@ -131,7 +150,18 @@ func RenderFirewall(data FirewallData, width, height int) string {
 				natRows = append(natRows, theme.StyleTableRowAlt.Render(line))
 			}
 		}
-		natCard = theme.StyleCard.Width(cardWidth).Render(natTitle + "\n\n" + natHeaderRendered + "\n" + strings.Join(natRows, "\n"))
+		var nb strings.Builder
+		nb.WriteString(natTitle)
+		nb.WriteString("\n\n")
+		nb.WriteString(natHeaderRendered)
+		nb.WriteByte('\n')
+		for i, r := range natRows {
+			if i > 0 {
+				nb.WriteByte('\n')
+			}
+			nb.WriteString(r)
+		}
+		natCard = theme.StyleCard.Width(cardWidth).Render(nb.String())
 	}
 
 	if natCard != "" {

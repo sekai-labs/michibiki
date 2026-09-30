@@ -297,7 +297,7 @@ func (b *BaseProvider) Connect(ctx context.Context, endpoint string, creds *mode
 	return nil
 }
 func (b *BaseProvider) Disconnect(ctx context.Context) error { return nil }
-func (b *BaseProvider) Capabilities() provider.Capabilities   { return 0 }
+func (b *BaseProvider) Capabilities() provider.Capabilities  { return 0 }
 func (b *BaseProvider) GetSystemInfo(ctx context.Context) (*model.SystemInfo, error) {
 	return nil, errors.New("not implemented")
 }

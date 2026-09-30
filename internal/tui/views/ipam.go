@@ -68,7 +68,10 @@ func RenderIPAM(data IPAMData, width, height int) string {
 		rightPaneWidth = 30
 	}
 
-	leftHeader := theme.StyleTitle.Render("SUBNETS & VLANS") + "\n\n"
+	var lhb strings.Builder
+	lhb.WriteString(theme.StyleTitle.Render("SUBNETS & VLANS"))
+	lhb.WriteString("\n\n")
+	leftHeader := lhb.String()
 	var leftRows []string
 	for i, sub := range subnets {
 		cidrStr := sub.CIDR.String()
@@ -87,16 +90,26 @@ func RenderIPAM(data IPAMData, width, height int) string {
 			leftRows = append(leftRows, theme.StyleCard.Width(leftPaneWidth-4).Render(rowText))
 		}
 	}
-	leftContent := leftHeader + strings.Join(leftRows, "\n")
+	var lcb strings.Builder
+	lcb.WriteString(leftHeader)
+	for i, r := range leftRows {
+		if i > 0 {
+			lcb.WriteByte('\n')
+		}
+		lcb.WriteString(r)
+	}
+	leftContent := lcb.String()
 	leftPane := lipgloss.NewStyle().Width(leftPaneWidth).Render(leftContent)
-
 	selIdx := data.SelectedIndex
 	if selIdx < 0 || selIdx >= len(subnets) {
 		selIdx = 0
 	}
 	currentSub := subnets[selIdx]
 
-	statsTitle := theme.StyleTitle.Render("SUBNET DETAILS: " + currentSub.CIDR.String())
+	var stb strings.Builder
+	stb.WriteString("SUBNET DETAILS: ")
+	stb.WriteString(currentSub.CIDR.String())
+	statsTitle := theme.StyleTitle.Render(stb.String())
 	statsBody := fmt.Sprintf("%s %s    %s %s\n%s %s    %s %s\n%s %d    %s %d    %s %d    %s %5.1f%%",
 		theme.StyleSubTitle.Render("Interface:   "), currentSub.InterfaceName,
 		theme.StyleSubTitle.Render("Gateway:     "), currentSub.GatewayIP.String(),
@@ -107,8 +120,11 @@ func RenderIPAM(data IPAMData, width, height int) string {
 		theme.StyleSubTitle.Render("Free IPs:    "), currentSub.FreeIPs,
 		theme.StyleSubTitle.Render("Utilization: "), currentSub.UtilizationPct,
 	)
-	statsCard := theme.StyleCard.Width(rightPaneWidth).Render(statsTitle + "\n\n" + statsBody)
-
+	var scb strings.Builder
+	scb.WriteString(statsTitle)
+	scb.WriteString("\n\n")
+	scb.WriteString(statsBody)
+	statsCard := theme.StyleCard.Width(rightPaneWidth).Render(scb.String())
 	freeIPsTitle := theme.StyleTitle.Render("NEXT AVAILABLE FREE IPS (READY FOR PROVISIONING)")
 	nextFree := currentSub.FindNextFree(8)
 	var freeIPTags []string
@@ -119,9 +135,20 @@ func RenderIPAM(data IPAMData, width, height int) string {
 			freeIPTags = append(freeIPTags, theme.StyleFreeIP.Render("  "+ip.String()+"  "))
 		}
 	}
-	freeIPsBody := strings.Join(freeIPTags, "  ")
-	freeCard := theme.StyleCard.Width(rightPaneWidth).Render(freeIPsTitle + "\n\n" + freeIPsBody)
+	var fbb strings.Builder
+	for i, t := range freeIPTags {
+		if i > 0 {
+			fbb.WriteString("  ")
+		}
+		fbb.WriteString(t)
+	}
+	freeIPsBody := fbb.String()
 
+	var fcb strings.Builder
+	fcb.WriteString(freeIPsTitle)
+	fcb.WriteString("\n\n")
+	fcb.WriteString(freeIPsBody)
+	freeCard := theme.StyleCard.Width(rightPaneWidth).Render(fcb.String())
 	allocTitle := theme.StyleTitle.Render(fmt.Sprintf("ALLOCATED IPS (%d)", len(currentSub.Allocations)))
 	allocHeader := fmt.Sprintf("%-16s %-18s %-20s %-16s %-10s", "IP ADDRESS", "MAC ADDRESS", "HOSTNAME", "SOURCE", "STATUS")
 	allocHeaderRendered := theme.StyleTableHeader.Render(allocHeader)
@@ -157,8 +184,18 @@ func RenderIPAM(data IPAMData, width, height int) string {
 		allocRows = append(allocRows, theme.StyleMuted.Render("No active allocations found in this subnet."))
 	}
 
-	allocCard := theme.StyleCard.Width(rightPaneWidth).Render(allocTitle + "\n\n" + allocHeaderRendered + "\n" + strings.Join(allocRows, "\n"))
-
+	var ab strings.Builder
+	ab.WriteString(allocTitle)
+	ab.WriteString("\n\n")
+	ab.WriteString(allocHeaderRendered)
+	ab.WriteByte('\n')
+	for i, r := range allocRows {
+		if i > 0 {
+			ab.WriteByte('\n')
+		}
+		ab.WriteString(r)
+	}
+	allocCard := theme.StyleCard.Width(rightPaneWidth).Render(ab.String())
 	rightContent := lipgloss.JoinVertical(lipgloss.Left, statsCard, freeCard, allocCard)
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightContent)
 }

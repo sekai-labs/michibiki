@@ -37,7 +37,7 @@ func (m *mockProviderPort) Connect(ctx context.Context, endpoint string, creds *
 	return nil
 }
 func (m *mockProviderPort) Disconnect(ctx context.Context) error { return nil }
-func (m *mockProviderPort) Capabilities() provider.Capabilities   { return m.caps }
+func (m *mockProviderPort) Capabilities() provider.Capabilities  { return m.caps }
 
 func (m *mockProviderPort) GetSystemInfo(ctx context.Context) (*model.SystemInfo, error) {
 	if !m.caps.Has(provider.CapSystem) {

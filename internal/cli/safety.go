@@ -216,28 +216,38 @@ func computeSimpleDiff(oldStr, newStr string) string {
 	oldLines := strings.Split(oldStr, "\n")
 	newLines := strings.Split(newStr, "\n")
 
-	var diffLines []string
+	var sb strings.Builder
+	first := true
+	writeLine := func(prefix, line string) {
+		if !first {
+			sb.WriteByte('\n')
+		}
+		first = false
+		sb.WriteString(prefix)
+		sb.WriteString(line)
+	}
+
 	i, j := 0, 0
 	for i < len(oldLines) && j < len(newLines) {
 		if oldLines[i] == newLines[j] {
-			diffLines = append(diffLines, "  "+oldLines[i])
+			writeLine("  ", oldLines[i])
 			i++
 			j++
 		} else {
-			diffLines = append(diffLines, "- "+oldLines[i])
-			diffLines = append(diffLines, "+ "+newLines[j])
+			writeLine("- ", oldLines[i])
+			writeLine("+ ", newLines[j])
 			i++
 			j++
 		}
 	}
 	for ; i < len(oldLines); i++ {
-		diffLines = append(diffLines, "- "+oldLines[i])
+		writeLine("- ", oldLines[i])
 	}
 	for ; j < len(newLines); j++ {
-		diffLines = append(diffLines, "+ "+newLines[j])
+		writeLine("+ ", newLines[j])
 	}
 
-	return strings.Join(diffLines, "\n")
+	return sb.String()
 }
 
 func init() {

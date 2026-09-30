@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 type SSHOptions struct {
@@ -21,7 +23,10 @@ type SSHOptions struct {
 	KeyPath    string
 	KeyData    []byte
 	Timeout    time.Duration
-	Passphrase string
+	Passphrase           string
+	HostKeyCallback      ssh.HostKeyCallback
+	KnownHostsFile       string
+	InsecureIgnoreHostKey bool
 }
 
 type SSHClient struct {
@@ -69,10 +74,36 @@ func (s *SSHClient) Connect(ctx context.Context) error {
 		}
 	}
 
+	hostKeyCallback := s.opts.HostKeyCallback
+	if hostKeyCallback == nil {
+		if s.opts.InsecureIgnoreHostKey {
+			hostKeyCallback = ssh.InsecureIgnoreHostKey()
+		} else {
+			knownHostsPath := s.opts.KnownHostsFile
+			if knownHostsPath == "" {
+				if home, err := os.UserHomeDir(); err == nil && home != "" {
+					defaultPath := filepath.Join(home, ".ssh", "known_hosts")
+					if _, err := os.Stat(defaultPath); err == nil {
+						knownHostsPath = defaultPath
+					}
+				}
+			}
+			if knownHostsPath != "" {
+				cb, err := knownhosts.New(knownHostsPath)
+				if err != nil {
+					return fmt.Errorf("failed to read known_hosts file %s: %w", knownHostsPath, err)
+				}
+				hostKeyCallback = cb
+			} else {
+				return fmt.Errorf("SSH host key verification failed: no known_hosts file found (specify KnownHostsFile or set InsecureIgnoreHostKey: true)")
+			}
+		}
+	}
+
 	config := &ssh.ClientConfig{
 		User:            s.opts.Username,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 		Timeout:         s.opts.Timeout,
 	}
 

@@ -274,7 +274,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			default:
 				if len(msg.String()) == 1 {
-					m.FilterInput += msg.String()
+					var fib strings.Builder
+					fib.WriteString(m.FilterInput)
+					fib.WriteString(msg.String())
+					m.FilterInput = fib.String()
 					m.updateViewportContent()
 				}
 				return m, nil
@@ -467,7 +470,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if SubTab(m.DetailSubTab) == SubTabOverview && m.ActivePanel == 1 {
 				m.moveCursor(-1)
 			} else {
-				m.Viewport.LineUp(1)
+				m.Viewport.ScrollUp(1)
 			}
 			m.updateViewportContent()
 			return m, nil
@@ -482,7 +485,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if SubTab(m.DetailSubTab) == SubTabOverview && m.ActivePanel == 1 {
 				m.moveCursor(1)
 			} else {
-				m.Viewport.LineDown(1)
+				m.Viewport.ScrollDown(1)
 			}
 			m.updateViewportContent()
 			return m, nil
@@ -515,7 +518,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.FocusedPane == PaneDock {
 				m.moveCursor(-5)
 			} else {
-				m.Viewport.HalfViewUp()
+				m.Viewport.HalfPageUp()
 			}
 			m.updateViewportContent()
 			return m, nil
@@ -524,7 +527,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.FocusedPane == PaneDock {
 				m.moveCursor(5)
 			} else {
-				m.Viewport.HalfViewDown()
+				m.Viewport.HalfPageDown()
 			}
 			m.updateViewportContent()
 			return m, nil
@@ -764,8 +767,14 @@ func (m Model) View() string {
 	rendered := lipgloss.JoinVertical(lipgloss.Left, header, mainArea, footer)
 	lines := strings.Split(rendered, "\n")
 	if len(lines) > m.Height && m.Height > 0 {
-		lines = lines[:m.Height]
-		rendered = strings.Join(lines, "\n")
+		var rb strings.Builder
+		for i := 0; i < m.Height; i++ {
+			if i > 0 {
+				rb.WriteByte('\n')
+			}
+			rb.WriteString(lines[i])
+		}
+		rendered = rb.String()
 	}
 
 	if m.ShowHelpModal {
@@ -783,12 +792,12 @@ func (m Model) renderHeader() string {
 
 	vendor := "UNKNOWN"
 	if m.Provider != nil {
-		vendor = m.Provider.Name()
+		vendor = strings.ToUpper(m.Provider.Name())
 	}
 
-	statusDot := StyleBadgeOnline.Render("● CONNECTED")
+	statusDot := StyleBadgeOnline.Render("● ONLINE")
 	if m.Provider == nil {
-		statusDot = StyleBadgeOffline.Render("○ DISCONNECTED")
+		statusDot = StyleBadgeOffline.Render("○ OFFLINE")
 	}
 
 	titleText := StyleHeader.Render(fmt.Sprintf(" ▜▔ MICHIBIKI [%s] ", dev))
@@ -799,7 +808,9 @@ func (m Model) renderHeader() string {
 	leftHeader := lipgloss.JoinHorizontal(lipgloss.Top, titleText, vendorText)
 	rightHeader := lipgloss.JoinHorizontal(lipgloss.Top, statusDot, clockText)
 
-	gap := m.Width - lipgloss.Width(leftHeader) - lipgloss.Width(rightHeader)
+	leftW := lipgloss.Width(leftHeader)
+	rightW := lipgloss.Width(rightHeader)
+	gap := m.Width - leftW - rightW
 	if gap < 0 {
 		gap = 0
 	}
@@ -811,33 +822,67 @@ func (m Model) renderHeader() string {
 
 func (m Model) renderFooter() string {
 	if m.FilterActive {
-		filterBar := StyleStatusKey.Render("FILTER: ") + m.FilterInput + " █ (esc/enter to finish)"
-		return StyleStatusBar.Width(m.Width).MaxWidth(m.Width).MaxHeight(1).Render(filterBar)
-	}
-	var keys []string
-	keys = append(keys, StyleStatusKey.Render("1-4")+" panels/subtabs")
-	keys = append(keys, StyleStatusKey.Render("h/l")+" dock/detail")
-	keys = append(keys, StyleStatusKey.Render("j/k")+" nav")
-	keys = append(keys, StyleStatusKey.Render("[]")+" tabs")
-	keys = append(keys, StyleStatusKey.Render("t")+" traffic")
-	keys = append(keys, StyleStatusKey.Render("i")+" ipam")
-	keys = append(keys, StyleStatusKey.Render("c")+" config")
-	if m.isPluginProvider() {
-		keys = append(keys, StyleStatusKey.Render("p")+" plugin")
-	}
-	keys = append(keys, StyleStatusKey.Render("/")+" filter")
-	keys = append(keys, StyleStatusKey.Render("y")+" yank")
-	keys = append(keys, StyleStatusKey.Render("r")+" reload")
-	keys = append(keys, StyleStatusKey.Render("?")+" help")
-	keys = append(keys, StyleStatusKey.Render("q")+" quit")
-	footerText := strings.Join(keys, " • ")
-	if m.StatusFlash != "" {
-		footerText = StyleBadgeWarning.Render(" "+m.StatusFlash+" ") + "  " + footerText
-	} else if m.Loading {
-		footerText += "  " + StyleProgressFilledWarn.Render("[FETCHING DATA...]")
+		filterPrompt := StyleStatusKey.Render(" SEARCH / FILTER ")
+		var fb strings.Builder
+		fb.WriteString(filterPrompt)
+		fmt.Fprintf(&fb, " %s█ (enter to apply • esc to cancel)", m.FilterInput)
+		return StyleStatusBar.Width(m.Width).MaxWidth(m.Width).MaxHeight(1).Render(fb.String())
 	}
 
-	return StyleStatusBar.Width(m.Width).MaxWidth(m.Width).MaxHeight(1).Render(footerText)
+	items := []struct {
+		key  string
+		desc string
+	}{
+		{"1-4", "panels"},
+		{"h/l", "dock/detail"},
+		{"j/k", "nav"},
+		{"[]", "tabs"},
+		{"t", "traffic"},
+		{"i", "ipam"},
+		{"c", "config"},
+	}
+	if m.isPluginProvider() {
+		items = append(items, struct {
+			key  string
+			desc string
+		}{"p", "plugin"})
+	}
+	items = append(items, []struct {
+		key  string
+		desc string
+	}{
+		{"/", "filter"},
+		{"y", "yank"},
+		{"r", "reload"},
+		{"?", "help"},
+		{"q", "quit"},
+	}...)
+
+	sep := lipgloss.NewStyle().Foreground(BorderInactive).Render(" • ")
+	var scb strings.Builder
+	for i, it := range items {
+		if i > 0 {
+			scb.WriteString(sep)
+		}
+		scb.WriteString(StyleStatusKey.Render(it.key))
+		scb.WriteString(" ")
+		scb.WriteString(it.desc)
+	}
+	centerShortcuts := scb.String()
+	var lpb strings.Builder
+	if m.StatusFlash != "" {
+		lpb.WriteString(StyleBadgeWarning.Render(fmt.Sprintf(" %s ", m.StatusFlash)))
+		lpb.WriteByte(' ')
+	} else if m.Loading {
+		lpb.WriteString(StyleBadgeInfo.Render(" SYNCING "))
+		lpb.WriteByte(' ')
+	}
+	leftPrefix := lpb.String()
+
+	var bar strings.Builder
+	bar.WriteString(leftPrefix)
+	bar.WriteString(centerShortcuts)
+	return StyleStatusBar.Width(m.Width).MaxWidth(m.Width).MaxHeight(1).Render(bar.String())
 }
 
 func (m Model) renderLeftDock(width, height int) string {
@@ -883,29 +928,49 @@ func (m Model) renderPanel0Status(width, height int, active bool) string {
 	if sys == nil {
 		lines = append(lines, theme.StyleMuted.Render("Loading telemetry..."))
 	} else {
-		lines = append(lines, fmt.Sprintf("%s %s", theme.StyleSubTitle.Render("Host:"), sys.Hostname))
-		osStr := fmt.Sprintf("%s %s", sys.OS, sys.Version)
+		var hostB strings.Builder
+		hostB.WriteString(theme.StyleSubTitle.Render("Host:"))
+		hostB.WriteByte(' ')
+		hostB.WriteString(sys.Hostname)
+		lines = append(lines, hostB.String())
+
+		var osB strings.Builder
+		osB.WriteString(sys.OS)
+		osB.WriteByte(' ')
+		osB.WriteString(sys.Version)
+		osStr := osB.String()
 		if len(osStr) > width-8 {
 			osStr = osStr[:width-8]
 		}
-		lines = append(lines, fmt.Sprintf("%s %s", theme.StyleSubTitle.Render("OS:  "), osStr))
+		var osLineB strings.Builder
+		osLineB.WriteString(theme.StyleSubTitle.Render("OS:  "))
+		osLineB.WriteByte(' ')
+		osLineB.WriteString(osStr)
+		lines = append(lines, osLineB.String())
 
 		uptimeStr := viewsFormatUptime(sys.UptimeSeconds)
-		lines = append(lines, fmt.Sprintf("%s %s", theme.StyleSubTitle.Render("Up:  "), uptimeStr))
-
+		var upB strings.Builder
+		upB.WriteString(theme.StyleSubTitle.Render("Up:  "))
+		upB.WriteByte(' ')
+		upB.WriteString(uptimeStr)
+		lines = append(lines, upB.String())
 		barWidth := width - 16
 		if barWidth < 6 {
 			barWidth = 6
 		}
 		cpuBar := RenderProgressBar(sys.CPUUsagePct, barWidth)
-		lines = append(lines, fmt.Sprintf("CPU %s %3.0f%%", cpuBar, sys.CPUUsagePct))
+		var cpuB strings.Builder
+		fmt.Fprintf(&cpuB, "CPU %s %3.0f%%", cpuBar, sys.CPUUsagePct)
+		lines = append(lines, cpuB.String())
 
 		var memPct float64
 		if sys.MemoryTotalBytes > 0 {
 			memPct = (float64(sys.MemoryUsedBytes) / float64(sys.MemoryTotalBytes)) * 100.0
 		}
 		memBar := RenderProgressBar(memPct, barWidth)
-		lines = append(lines, fmt.Sprintf("MEM %s %3.0f%%", memBar, memPct))
+		var memB strings.Builder
+		fmt.Fprintf(&memB, "MEM %s %3.0f%%", memBar, memPct)
+		lines = append(lines, memB.String())
 	}
 
 	return renderDockBox(title, active, width, height, lines)
@@ -1061,28 +1126,35 @@ func (m Model) renderPanel3Services(width, height int, active bool) string {
 	}
 
 	var lines []string
-	lines = append(lines, fmt.Sprintf("%s %s %d rules",
-		theme.StyleSubTitle.Render("Firewall: "),
-		StyleBadgeInfo.Render("FW"),
-		fwCount,
-	))
-	lines = append(lines, fmt.Sprintf("%s %s %d leases",
-		theme.StyleSubTitle.Render("DHCP:     "),
-		StyleBadgeOnline.Render("DHCP"),
-		dhcpCount,
-	))
-	lines = append(lines, fmt.Sprintf("%s %s %d peers",
-		theme.StyleSubTitle.Render("VPN:      "),
-		StyleBadgeOnline.Render("WG"),
-		vpnCount,
-	))
+
+	var fwB strings.Builder
+	fwB.WriteString(theme.StyleSubTitle.Render("Firewall: "))
+	fwB.WriteByte(' ')
+	fwB.WriteString(StyleBadgeInfo.Render("FW"))
+	fmt.Fprintf(&fwB, " %d rules", fwCount)
+	lines = append(lines, fwB.String())
+
+	var dhcpB strings.Builder
+	dhcpB.WriteString(theme.StyleSubTitle.Render("DHCP:     "))
+	dhcpB.WriteByte(' ')
+	dhcpB.WriteString(StyleBadgeOnline.Render("DHCP"))
+	fmt.Fprintf(&dhcpB, " %d leases", dhcpCount)
+	lines = append(lines, dhcpB.String())
+
+	var vpnB strings.Builder
+	vpnB.WriteString(theme.StyleSubTitle.Render("VPN:      "))
+	vpnB.WriteByte(' ')
+	vpnB.WriteString(StyleBadgeOnline.Render("WG"))
+	fmt.Fprintf(&vpnB, " %d peers", vpnCount)
+	lines = append(lines, vpnB.String())
 
 	arpCount := len(m.LastFetched.ARP)
-	lines = append(lines, fmt.Sprintf("%s %s %d entries",
-		theme.StyleSubTitle.Render("ARP:      "),
-		StyleBadgeInfo.Render("ARP"),
-		arpCount,
-	))
+	var arpB strings.Builder
+	arpB.WriteString(theme.StyleSubTitle.Render("ARP:      "))
+	arpB.WriteByte(' ')
+	arpB.WriteString(StyleBadgeInfo.Render("ARP"))
+	fmt.Fprintf(&arpB, " %d entries", arpCount)
+	lines = append(lines, arpB.String())
 
 	return renderDockBox(title, active, width, height, lines)
 }
@@ -1092,17 +1164,18 @@ func (m Model) renderRightDetail(width, height int) string {
 
 	var tabStrs []string
 	for idx, name := range m.getSubTabNames() {
+		renderedTab := fmt.Sprintf(" %s ", name)
 		if idx == m.DetailSubTab {
-			tabStrs = append(tabStrs, StyleSubTabActive.Render(name))
+			tabStrs = append(tabStrs, StyleSubTabActive.Render(renderedTab))
 		} else {
-			tabStrs = append(tabStrs, StyleSubTabInactive.Render(name))
+			tabStrs = append(tabStrs, StyleSubTabInactive.Render(renderedTab))
 		}
 	}
 	tabsRow := lipgloss.JoinHorizontal(lipgloss.Top, tabStrs...)
 
-	borderColor := ColorDarkGray
+	borderColor := BorderInactive
 	if isDetailActive {
-		borderColor = ColorCyan
+		borderColor = BorderActive
 	}
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
 
@@ -1118,7 +1191,11 @@ func (m Model) renderRightDetail(width, height int) string {
 	if remainTop < 0 {
 		remainTop = 0
 	}
-	topLine := borderStyle.Render("╭") + titleRendered + borderStyle.Render(strings.Repeat("─", remainTop)+"╮")
+	var topSb strings.Builder
+	topSb.WriteString(borderStyle.Render("╭"))
+	topSb.WriteString(titleRendered)
+	topSb.WriteString(borderStyle.Render(strings.Repeat("─", remainTop) + "╮"))
+	topLine := topSb.String()
 
 	innerWidth := width - 2
 	if innerWidth < 0 {
@@ -1128,10 +1205,14 @@ func (m Model) renderRightDetail(width, height int) string {
 	if tabsPad < 0 {
 		tabsPad = 0
 	}
-	subTabsLine := borderStyle.Render("│") + tabsRow + strings.Repeat(" ", tabsPad) + borderStyle.Render("│")
+	var subTabsSb strings.Builder
+	subTabsSb.WriteString(borderStyle.Render("│"))
+	subTabsSb.WriteString(tabsRow)
+	subTabsSb.WriteString(strings.Repeat(" ", tabsPad))
+	subTabsSb.WriteString(borderStyle.Render("│"))
+	subTabsLine := subTabsSb.String()
 
 	divLine := borderStyle.Render("├" + strings.Repeat("─", innerWidth) + "┤")
-
 	viewportView := m.Viewport.View()
 	contentLines := strings.Split(viewportView, "\n")
 	viewportHeight := height - 4
@@ -1139,10 +1220,15 @@ func (m Model) renderRightDetail(width, height int) string {
 		viewportHeight = 1
 	}
 
-	var res []string
-	res = append(res, topLine, subTabsLine, divLine)
+	var sb strings.Builder
+	sb.WriteString(topLine)
+	sb.WriteByte('\n')
+	sb.WriteString(subTabsLine)
+	sb.WriteByte('\n')
+	sb.WriteString(divLine)
 
-	for i := 0; i < viewportHeight; i++ {
+	for i := range viewportHeight {
+		sb.WriteByte('\n')
 		line := ""
 		if i < len(contentLines) {
 			line = contentLines[i]
@@ -1156,14 +1242,15 @@ func (m Model) renderRightDetail(width, height int) string {
 				pad = 0
 			}
 		}
-		row := borderStyle.Render("│") + line + strings.Repeat(" ", pad) + borderStyle.Render("│")
-		res = append(res, row)
+		sb.WriteString(borderStyle.Render("│"))
+		sb.WriteString(line)
+		sb.WriteString(strings.Repeat(" ", pad))
+		sb.WriteString(borderStyle.Render("│"))
 	}
 
-	bottomLine := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
-	res = append(res, bottomLine)
-
-	return strings.Join(res, "\n")
+	sb.WriteByte('\n')
+	sb.WriteString(borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯"))
+	return sb.String()
 }
 
 func (m Model) renderDetailContent() string {
@@ -1296,6 +1383,11 @@ func (m Model) renderDetailContent() string {
 }
 
 func (m Model) overlayHelpModal(baseView string) string {
+	title := StyleTitle.Render("MICHIBIKI DOCK NAVIGATION & KEYMAPS")
+	secFocus := StyleSubTitle.Render("PANEL & FOCUS SWITCHING")
+	secNav := StyleSubTitle.Render("NAVIGATION & SCROLLING")
+	secActions := StyleSubTitle.Render("ACTIONS & SUB-TABS")
+
 	modalContent := fmt.Sprintf(`%s
 
 %s
@@ -1326,10 +1418,10 @@ func (m Model) overlayHelpModal(baseView string) string {
   ?           Toggle this Help Modal
   q / ctrl+c  Quit Michibiki TUI
 `,
-		StyleTitle.Render("MICHIBIKI DOCK NAVIGATION & NEOVIM KEYMAPS"),
-		StyleSubTitle.Render("PANEL & FOCUS SWITCHING"),
-		StyleSubTitle.Render("NAVIGATION & SCROLLING"),
-		StyleSubTitle.Render("ACTIONS & SUB-TABS"),
+		title,
+		secFocus,
+		secNav,
+		secActions,
 	)
 
 	modalBox := StyleModal.Render(modalContent)
@@ -1358,23 +1450,25 @@ func (m Model) overlayHelpModal(baseView string) string {
 		left = 0
 	}
 
-	res := make([]string, len(bgLines))
-	for y := 0; y < len(bgLines); y++ {
+	var sb strings.Builder
+	for y := range bgLines {
+		if y > 0 {
+			sb.WriteByte('\n')
+		}
 		if y >= top && y < top+modalH {
 			mLine := modalLines[y-top]
-			leftPad := strings.Repeat(" ", left)
+			sb.WriteString(strings.Repeat(" ", left))
+			sb.WriteString(mLine)
 			rightPadLen := m.Width - left - lipgloss.Width(mLine)
-			if rightPadLen < 0 {
-				rightPadLen = 0
+			if rightPadLen > 0 {
+				sb.WriteString(strings.Repeat(" ", rightPadLen))
 			}
-			rightPad := strings.Repeat(" ", rightPadLen)
-			res[y] = leftPad + mLine + rightPad
 		} else {
-			res[y] = bgLines[y]
+			sb.WriteString(bgLines[y])
 		}
 	}
 
-	return strings.Join(res, "\n")
+	return sb.String()
 }
 
 func renderDockBox(title string, isActive bool, width int, height int, innerLines []string) string {
@@ -1385,21 +1479,31 @@ func renderDockBox(title string, isActive bool, width int, height int, innerLine
 		height = 3
 	}
 
-	borderColor := theme.ColorDarkGray
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(theme.ColorLightGray)
+	borderColor := BorderInactive
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(TextSecondary)
 	if isActive {
-		borderColor = theme.ColorAccent
-		titleStyle = lipgloss.NewStyle().Bold(true).Foreground(theme.ColorAccent)
+		borderColor = BorderActive
+		titleStyle = lipgloss.NewStyle().Bold(true).Foreground(BorderActive)
 	}
 	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
 
-	titleRendered := " " + titleStyle.Render(title) + " "
+	var tb strings.Builder
+	tb.WriteString(" ")
+	tb.WriteString(titleStyle.Render(title))
+	tb.WriteString(" ")
+	titleRendered := tb.String()
+
 	titleLen := lipgloss.Width(titleRendered)
 	remain := width - 2 - 1 - titleLen
 	if remain < 0 {
 		remain = 0
 	}
-	top := borderStyle.Render("╭─") + titleRendered + borderStyle.Render(strings.Repeat("─", remain)+"╮")
+
+	var topSb strings.Builder
+	topSb.WriteString(borderStyle.Render("╭─"))
+	topSb.WriteString(titleRendered)
+	topSb.WriteString(borderStyle.Render(strings.Repeat("─", remain) + "╮"))
+	top := topSb.String()
 
 	bodyHeight := height - 2
 	innerWidth := width - 2
@@ -1407,10 +1511,11 @@ func renderDockBox(title string, isActive bool, width int, height int, innerLine
 		innerWidth = 0
 	}
 
-	var res []string
-	res = append(res, top)
+	var sb strings.Builder
+	sb.WriteString(top)
 
-	for i := 0; i < bodyHeight; i++ {
+	for i := range bodyHeight {
+		sb.WriteByte('\n')
 		line := ""
 		if i < len(innerLines) {
 			line = innerLines[i]
@@ -1423,14 +1528,15 @@ func renderDockBox(title string, isActive bool, width int, height int, innerLine
 		if pad < 0 {
 			pad = 0
 		}
-		middle := borderStyle.Render("│") + line + strings.Repeat(" ", pad) + borderStyle.Render("│")
-		res = append(res, middle)
+		sb.WriteString(borderStyle.Render("│"))
+		sb.WriteString(line)
+		sb.WriteString(strings.Repeat(" ", pad))
+		sb.WriteString(borderStyle.Render("│"))
 	}
 
-	bottom := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
-	res = append(res, bottom)
-
-	return strings.Join(res, "\n")
+	sb.WriteByte('\n')
+	sb.WriteString(borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯"))
+	return sb.String()
 }
 
 func viewsFormatUptime(seconds uint64) string {

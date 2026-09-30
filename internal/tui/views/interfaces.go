@@ -18,8 +18,11 @@ type InterfacesData struct {
 
 func RenderInterfaces(data InterfacesData, width, height int) string {
 	if data.Error != nil {
+		var eb strings.Builder
+		eb.WriteString("Failed to load interfaces: ")
+		eb.WriteString(data.Error.Error())
 		return theme.StyleCardAlert.Width(width - 4).Render(
-			theme.StyleError.Render("Failed to load interfaces: " + data.Error.Error()),
+			theme.StyleError.Render(eb.String()),
 		)
 	}
 	if len(data.Interfaces) == 0 {
@@ -80,15 +83,26 @@ func RenderInterfaces(data InterfacesData, width, height int) string {
 			operBadge = theme.StyleBadgeOffline.Render(strings.ToUpper(string(iface.OperStatus)))
 		}
 
-		ips := strings.Join(iface.IPv4Addresses, ", ")
-		if ips == "" && len(iface.IPv6Addresses) > 0 {
-			ips = strings.Join(iface.IPv6Addresses, ", ")
+		var ipsB strings.Builder
+		addrList := iface.IPv4Addresses
+		if len(addrList) == 0 && len(iface.IPv6Addresses) > 0 {
+			addrList = iface.IPv6Addresses
 		}
+		for idx, addr := range addrList {
+			if idx > 0 {
+				ipsB.WriteString(", ")
+			}
+			ipsB.WriteString(addr)
+		}
+		ips := ipsB.String()
 		if ips == "" {
 			ips = "-"
 		}
 		if len(ips) > 20 {
-			ips = ips[:17] + "..."
+			var tb strings.Builder
+			tb.WriteString(ips[:17])
+			tb.WriteString("...")
+			ips = tb.String()
 		}
 
 		mac := iface.MACAddress
@@ -129,8 +143,16 @@ func RenderInterfaces(data InterfacesData, width, height int) string {
 		}
 	}
 
-	content := headerRendered + "\n" + strings.Join(rows, "\n")
-	return theme.StyleCard.Width(width - 4).Render(content)
+	var b strings.Builder
+	b.WriteString(headerRendered)
+	b.WriteByte('\n')
+	for i, r := range rows {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(r)
+	}
+	return theme.StyleCard.Width(width - 4).Render(b.String())
 }
 
 func formatSpeed(bps uint64) string {

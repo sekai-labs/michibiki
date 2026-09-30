@@ -17,6 +17,22 @@ var (
 	ColorWhite     = theme.ColorWhite
 	ColorBg        = theme.ColorBg
 	ColorCardBg    = theme.ColorCardBg
+	BgBase         = theme.BgBase
+	BgCard         = theme.BgCard
+	BgOverlay      = theme.BgOverlay
+	BgActive       = theme.BgActive
+	BorderInactive = theme.BorderInactive
+	BorderActive   = theme.BorderActive
+	BorderMuted    = theme.BorderMuted
+	TextPrimary    = theme.TextPrimary
+	TextSecondary  = theme.TextSecondary
+	TextMuted      = theme.TextMuted
+	TextDisabled   = theme.TextDisabled
+	AccentCyan     = theme.AccentCyan
+	AccentViolet   = theme.AccentViolet
+	AccentGreen    = theme.AccentGreen
+	AccentAmber    = theme.AccentAmber
+	AccentRose     = theme.AccentRose
 
 	StyleHeader               = theme.StyleHeader
 	StyleHeaderSub            = theme.StyleHeaderSub
@@ -43,12 +59,13 @@ var (
 	StyleFreeIP               = theme.StyleFreeIP
 	StyleMuted                = theme.StyleMuted
 	StyleError                = theme.StyleError
-	StyleDockSelected   = theme.StyleDockSelected
-	StyleSubTabActive   = theme.StyleSubTabActive
-	StyleSubTabInactive = theme.StyleSubTabInactive
-	StyleCursor         = theme.StyleCursor
-	StyleModal          = theme.StyleModal
+	StyleDockSelected         = theme.StyleDockSelected
+	StyleSubTabActive         = theme.StyleSubTabActive
+	StyleSubTabInactive       = theme.StyleSubTabInactive
+	StyleCursor               = theme.StyleCursor
+	StyleModal                = theme.StyleModal
 )
+
 func RenderProgressBar(pct float64, width int) string {
 	return theme.RenderProgressBar(pct, width)
 }

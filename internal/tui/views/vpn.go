@@ -16,8 +16,11 @@ type VPNData struct {
 
 func RenderVPN(data VPNData, width, height int) string {
 	if data.Error != nil {
+		var eb strings.Builder
+		eb.WriteString("Failed to load VPN peers: ")
+		eb.WriteString(data.Error.Error())
 		return theme.StyleCardAlert.Width(width - 4).Render(
-			theme.StyleError.Render("Failed to load VPN peers: " + data.Error.Error()),
+			theme.StyleError.Render(eb.String()),
 		)
 	}
 
@@ -36,7 +39,11 @@ func RenderVPN(data VPNData, width, height int) string {
 	for i, p := range data.Peers {
 		pubKey := p.PublicKey
 		if len(pubKey) > 20 {
-			pubKey = pubKey[:10] + "..." + pubKey[len(pubKey)-6:]
+			var pkb strings.Builder
+			pkb.WriteString(pubKey[:10])
+			pkb.WriteString("...")
+			pkb.WriteString(pubKey[len(pubKey)-6:])
+			pubKey = pkb.String()
 		}
 
 		endpoint := p.Endpoint
@@ -44,9 +51,19 @@ func RenderVPN(data VPNData, width, height int) string {
 			endpoint = "(none)"
 		}
 
-		allowed := strings.Join(p.AllowedIPs, ", ")
+		var alb strings.Builder
+		for idx, ip := range p.AllowedIPs {
+			if idx > 0 {
+				alb.WriteString(", ")
+			}
+			alb.WriteString(ip)
+		}
+		allowed := alb.String()
 		if len(allowed) > 20 {
-			allowed = allowed[:17] + "..."
+			var tb strings.Builder
+			tb.WriteString(allowed[:17])
+			tb.WriteString("...")
+			allowed = tb.String()
 		}
 
 		handshakeStr := "never"
@@ -77,6 +94,16 @@ func RenderVPN(data VPNData, width, height int) string {
 		rows = append(rows, theme.StyleMuted.Render("No WireGuard peers configured."))
 	}
 
-	content := title + "\n\n" + headerRendered + "\n" + strings.Join(rows, "\n")
-	return theme.StyleCard.Width(cardWidth).Render(content)
+	var b strings.Builder
+	b.WriteString(title)
+	b.WriteString("\n\n")
+	b.WriteString(headerRendered)
+	b.WriteByte('\n')
+	for i, r := range rows {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(r)
+	}
+	return theme.StyleCard.Width(cardWidth).Render(b.String())
 }

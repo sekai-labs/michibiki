@@ -163,11 +163,11 @@ var ipFreeCmd = &cobra.Command{
 		}
 
 		type FreeReport struct {
-			Subnet     string        `json:"subnet" yaml:"subnet"`
-			Interface  string        `json:"interface,omitempty" yaml:"interface,omitempty"`
-			VLANID     int           `json:"vlan_id,omitempty" yaml:"vlan_id,omitempty"`
-			FreeCount  int           `json:"free_count" yaml:"free_count"`
-			NextFree   []string      `json:"next_free" yaml:"next_free"`
+			Subnet     string         `json:"subnet" yaml:"subnet"`
+			Interface  string         `json:"interface,omitempty" yaml:"interface,omitempty"`
+			VLANID     int            `json:"vlan_id,omitempty" yaml:"vlan_id,omitempty"`
+			FreeCount  int            `json:"free_count" yaml:"free_count"`
+			NextFree   []string       `json:"next_free" yaml:"next_free"`
 			FreeRanges []ipam.IPRange `json:"free_ranges" yaml:"free_ranges"`
 		}
 

@@ -106,8 +106,18 @@ func RenderMonitor(data MonitorData, width, height int) string {
 		rows = append(rows, theme.StyleMuted.Render("No interface statistics available."))
 	}
 
-	content := title + "\n\n" + headerRendered + "\n" + strings.Join(rows, "\n")
-	return theme.StyleCard.Width(cardWidth).Render(content)
+	var b strings.Builder
+	b.WriteString(title)
+	b.WriteString("\n\n")
+	b.WriteString(headerRendered)
+	b.WriteByte('\n')
+	for i, r := range rows {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(r)
+	}
+	return theme.StyleCard.Width(cardWidth).Render(b.String())
 }
 
 func formatRate(bps float64) string {

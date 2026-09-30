@@ -7,6 +7,7 @@ import (
 	"github.com/sekai-labs/michibiki/pkg/model"
 	"github.com/sekai-labs/michibiki/pkg/provider"
 )
+
 type NetworkHandler struct {
 	prov port.ProviderPort
 }

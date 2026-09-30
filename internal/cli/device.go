@@ -221,7 +221,11 @@ var deviceTestCmd = &cobra.Command{
 
 		endpoint := profile.Address
 		if profile.Port > 0 && !strings.Contains(endpoint, ":") {
-			endpoint = netip.AddrPortFrom(netip.MustParseAddr(profile.Address), uint16(profile.Port)).String()
+			if addr, err := netip.ParseAddr(profile.Address); err == nil {
+				endpoint = netip.AddrPortFrom(addr, uint16(profile.Port)).String()
+			} else {
+				endpoint = fmt.Sprintf("%s:%d", profile.Address, profile.Port)
+			}
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

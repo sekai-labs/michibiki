@@ -3,11 +3,12 @@ package plugin
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
-
 	"github.com/sekai-labs/michibiki/pkg/credential"
 	"github.com/sekai-labs/michibiki/pkg/ipam"
 	"github.com/sekai-labs/michibiki/pkg/model"
@@ -81,7 +82,26 @@ func (p *Plugin) Connect(ctx context.Context, endpoint string, creds *credential
 		p.cmd = nil
 	}
 
-	cmd := exec.CommandContext(ctx, p.binaryPath)
+	absBinary, err := filepath.Abs(p.binaryPath)
+	if err != nil {
+		return fmt.Errorf("invalid plugin binary path: %w", err)
+	}
+
+	info, err := os.Stat(absBinary)
+	if err != nil {
+		return fmt.Errorf("plugin binary not found: %w", err)
+	}
+	if info.IsDir() || !info.Mode().IsRegular() {
+		return fmt.Errorf("plugin binary %s is not a regular file", absBinary)
+	}
+	if info.Mode()&0111 == 0 {
+		return fmt.Errorf("plugin binary %s is not executable", absBinary)
+	}
+	if info.Mode()&0022 != 0 {
+		return fmt.Errorf("plugin binary %s is insecure: group or world writable (mode: %o)", absBinary, info.Mode().Perm())
+	}
+
+	cmd := exec.CommandContext(ctx, absBinary)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -404,4 +424,3 @@ func (p *Plugin) RollbackConfig(ctx context.Context, rollbackID string) error {
 	var dummy any
 	return client.Call(ctx, MethodProviderRollback, RollbackConfigParams{RollbackID: rollbackID}, &dummy)
 }
-

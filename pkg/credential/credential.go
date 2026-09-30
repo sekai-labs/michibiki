@@ -1,6 +1,7 @@
 package credential
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -12,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/crypto/argon2"
 )
 
 var (
@@ -28,6 +31,64 @@ type Credentials struct {
 	Token      string            `json:"token,omitempty" yaml:"token,omitempty"`
 	SSHKeyPath string            `json:"ssh_key_path,omitempty" yaml:"ssh_key_path,omitempty"`
 	Custom     map[string]string `json:"custom,omitempty" yaml:"custom,omitempty"`
+}
+func (c Credentials) String() string {
+	var sb strings.Builder
+	sb.WriteString("Credentials{")
+	first := true
+	addPart := func(part string) {
+		if !first {
+			sb.WriteString(", ")
+		}
+		first = false
+		sb.WriteString(part)
+	}
+
+	if c.Username != "" {
+		addPart("username=" + c.Username)
+	}
+	if c.Password != "" {
+		addPart("password=REDACTED")
+	}
+	if c.APIKey != "" {
+		addPart("api_key=REDACTED")
+	}
+	if c.APISecret != "" {
+		addPart("api_secret=REDACTED")
+	}
+	if c.Token != "" {
+		addPart("token=REDACTED")
+	}
+	if c.SSHKeyPath != "" {
+		addPart("ssh_key_path=" + c.SSHKeyPath)
+	}
+	if len(c.Custom) > 0 {
+		addPart(fmt.Sprintf("custom=[%d keys]", len(c.Custom)))
+	}
+	sb.WriteByte('}')
+	return sb.String()
+}
+func (c Credentials) Redacted() Credentials {
+	clone := c
+	if clone.Password != "" {
+		clone.Password = "••••••••"
+	}
+	if clone.APIKey != "" {
+		clone.APIKey = "••••••••"
+	}
+	if clone.APISecret != "" {
+		clone.APISecret = "••••••••"
+	}
+	if clone.Token != "" {
+		clone.Token = "••••••••"
+	}
+	if clone.Custom != nil {
+		clone.Custom = make(map[string]string)
+		for k := range c.Custom {
+			clone.Custom[k] = "••••••••"
+		}
+	}
+	return clone
 }
 
 type Store interface {
@@ -49,7 +110,17 @@ func NewVaultStore(path string, passphrase string) *VaultStore {
 	}
 }
 
-func (v *VaultStore) deriveKey() []byte {
+const (
+	vaultMagicV2 = "MBKV"
+	vaultVersion2 = 0x02
+	saltSize     = 16
+)
+
+func deriveKeyArgon2id(passphrase string, salt []byte) []byte {
+	return argon2.IDKey([]byte(passphrase), salt, 3, 64*1024, 2, 32)
+}
+
+func (v *VaultStore) deriveKeyLegacy() []byte {
 	h := sha256.Sum256([]byte(v.passphrase))
 	return h[:]
 }
@@ -64,11 +135,42 @@ func (v *VaultStore) readAll() (map[string]Credentials, error) {
 		return nil, err
 	}
 
-	if len(data) < 12 {
-		return nil, ErrInvalidFormat
-	}
+	var key []byte
+	var nonce []byte
+	var ciphertext []byte
 
-	key := v.deriveKey()
+	if len(data) >= 4+1+saltSize && bytes.Equal(data[:4], []byte(vaultMagicV2)) && data[4] == vaultVersion2 {
+		salt := data[5 : 5+saltSize]
+		key = deriveKeyArgon2id(v.passphrase, salt)
+		offset := 5 + saltSize
+
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+		aesGCM, err := cipher.NewGCM(block)
+		if err != nil {
+			return nil, err
+		}
+		nonceSize := aesGCM.NonceSize()
+		if len(data) < offset+nonceSize {
+			return nil, ErrInvalidFormat
+		}
+		nonce = data[offset : offset+nonceSize]
+		ciphertext = data[offset+nonceSize:]
+
+		plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+		if err != nil {
+			return nil, ErrVaultLocked
+		}
+
+		var m map[string]Credentials
+		if err := json.Unmarshal(plaintext, &m); err != nil {
+			return nil, err
+		}
+		return m, nil
+	}
+	key = v.deriveKeyLegacy()
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -84,7 +186,7 @@ func (v *VaultStore) readAll() (map[string]Credentials, error) {
 		return nil, ErrInvalidFormat
 	}
 
-	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	nonce, ciphertext = data[:nonceSize], data[nonceSize:]
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return nil, ErrVaultLocked
@@ -109,7 +211,12 @@ func (v *VaultStore) writeAll(m map[string]Credentials) error {
 		return err
 	}
 
-	key := v.deriveKey()
+	salt := make([]byte, saltSize)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
+		return fmt.Errorf("failed to generate random salt: %w", err)
+	}
+
+	key := deriveKeyArgon2id(v.passphrase, salt)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err
@@ -125,8 +232,15 @@ func (v *VaultStore) writeAll(m map[string]Credentials) error {
 		return err
 	}
 
-	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
-	return os.WriteFile(v.path, ciphertext, 0600)
+	ciphertext := aesGCM.Seal(nil, nonce, plaintext, nil)
+	var buf bytes.Buffer
+	buf.WriteString(vaultMagicV2)
+	buf.WriteByte(vaultVersion2)
+	buf.Write(salt)
+	buf.Write(nonce)
+	buf.Write(ciphertext)
+
+	return os.WriteFile(v.path, buf.Bytes(), 0600)
 }
 
 func (v *VaultStore) Get(key string) (*Credentials, error) {

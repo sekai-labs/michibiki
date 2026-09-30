@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"fmt"
 	"os"
+	"strings"
 
 	"github.com/sekai-labs/michibiki/pkg/credential"
 )
@@ -54,5 +54,9 @@ func ObfuscateCredential(creds *credential.Credentials) string {
 	if len(raw) <= 8 {
 		return "••••••••"
 	}
-	return fmt.Sprintf("%s...%s", raw[:4], raw[len(raw)-4:])
+	var b strings.Builder
+	b.WriteString(raw[:4])
+	b.WriteString("...")
+	b.WriteString(raw[len(raw)-4:])
+	return b.String()
 }

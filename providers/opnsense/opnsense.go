@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -281,7 +283,6 @@ func (p *Provider) ListInterfaces(ctx context.Context) ([]model.Interface, error
 	}
 	return list, nil
 }
-
 
 func (p *Provider) GetInterface(ctx context.Context, name string) (*model.Interface, error) {
 	ifaces, err := p.ListInterfaces(ctx)
@@ -635,13 +636,19 @@ func (p *Provider) ApplyConfig(ctx context.Context, req model.ConfigApplyRequest
 	}, nil
 }
 
+var rollbackIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
 func (p *Provider) RollbackConfig(ctx context.Context, rollbackID string) error {
+	if !rollbackIDPattern.MatchString(rollbackID) {
+		return fmt.Errorf("invalid rollback ID: %q", rollbackID)
+	}
+
 	c, err := p.getClient()
 	if err != nil {
 		return err
 	}
 	var resp map[string]any
-	return c.Do(ctx, "POST", "/api/core/backup/rollback/"+rollbackID, nil, &resp)
+	return c.Do(ctx, "POST", "/api/core/backup/rollback/"+url.PathEscape(rollbackID), nil, &resp)
 }
 
 func ParseJSON(data []byte, v any) error {

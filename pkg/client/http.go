@@ -67,12 +67,22 @@ func NewHTTPClient(opts HTTPOptions) *HTTPClient {
 				return fmt.Errorf("stopped after 10 redirects")
 			}
 			if len(via) > 0 {
-				if clientObj.apiKey != "" && clientObj.apiSecret != "" {
-					req.SetBasicAuth(clientObj.apiKey, clientObj.apiSecret)
-				} else if clientObj.username != "" || clientObj.password != "" {
-					req.SetBasicAuth(clientObj.username, clientObj.password)
-				} else if clientObj.token != "" {
-					req.Header.Set("Authorization", "Bearer "+clientObj.token)
+				prevReq := via[len(via)-1]
+				isSameHost := strings.EqualFold(req.URL.Hostname(), prevReq.URL.Hostname()) && req.URL.Port() == prevReq.URL.Port()
+				isHttpsDowngrade := prevReq.URL.Scheme == "https" && req.URL.Scheme == "http"
+
+				if !isSameHost || isHttpsDowngrade {
+					req.Header.Del("Authorization")
+					req.Header.Del("Proxy-Authorization")
+					req.Header.Del("Cookie")
+				} else {
+					if clientObj.apiKey != "" && clientObj.apiSecret != "" {
+						req.SetBasicAuth(clientObj.apiKey, clientObj.apiSecret)
+					} else if clientObj.username != "" || clientObj.password != "" {
+						req.SetBasicAuth(clientObj.username, clientObj.password)
+					} else if clientObj.token != "" {
+						req.Header.Set("Authorization", "Bearer "+clientObj.token)
+					}
 				}
 			}
 			return nil

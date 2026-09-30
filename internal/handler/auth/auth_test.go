@@ -1,12 +1,12 @@
 package auth_test
 
 import (
-	"os"
-	"path/filepath"
-	"testing"
 	"github.com/sekai-labs/michibiki/internal/handler/auth"
 	"github.com/sekai-labs/michibiki/internal/port"
 	"github.com/sekai-labs/michibiki/pkg/credential"
+	"os"
+	"path/filepath"
+	"testing"
 )
 
 func TestAuthHandler_ParseTokenFile(t *testing.T) {
@@ -132,5 +132,41 @@ func TestAuthHandler_EncryptedSessionLifecycle(t *testing.T) {
 	}
 	if status.Active {
 		t.Fatalf("expected session to be inactive after clear")
+	}
+}
+func TestAuthHandler_SessionKeyPermissions(t *testing.T) {
+	tempDir := t.TempDir()
+	sessionFile := filepath.Join(tempDir, "michibiki_session.enc")
+	sessionKeyFile := filepath.Join(tempDir, "session_key")
+	authHdlr := auth.NewAuthHandlerWithPath(sessionFile)
+
+	testCreds := &credential.Credentials{
+		Token: "test-token-value",
+	}
+	if err := authHdlr.StoreTempEncryptedToken("gw1", testCreds); err != nil {
+		t.Fatalf("StoreTempEncryptedToken failed: %v", err)
+	}
+
+	keyInfo, err := os.Stat(sessionKeyFile)
+	if err != nil {
+		t.Fatalf("session key file was not created: %v", err)
+	}
+	if perm := keyInfo.Mode().Perm(); perm != 0600 {
+		t.Fatalf("expected session key permissions 0600, got %o", perm)
+	}
+
+	sessInfo, err := os.Stat(sessionFile)
+	if err != nil {
+		t.Fatalf("session file was not created: %v", err)
+	}
+	if perm := sessInfo.Mode().Perm(); perm != 0600 {
+		t.Fatalf("expected session file permissions 0600, got %o", perm)
+	}
+	loaded, err := authHdlr.LoadTempEncryptedToken("gw1")
+	if err != nil {
+		t.Fatalf("failed to load token: %v", err)
+	}
+	if loaded.Token != "test-token-value" {
+		t.Fatalf("expected token 'test-token-value', got %s", loaded.Token)
 	}
 }

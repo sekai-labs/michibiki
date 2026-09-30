@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/sekai-labs/michibiki/pkg/model"
 	"github.com/sekai-labs/michibiki/pkg/provider"
 )
-
 
 func TestClientCall(t *testing.T) {
 	clientR, serverW := io.Pipe()
@@ -276,4 +276,71 @@ done
 		t.Fatalf("failed to connect dummy provider: %v", err)
 	}
 	_ = prov.Disconnect(ctx)
+}
+func TestDiscovery_UntrustedSandbox(t *testing.T) {
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to getwd: %v", err)
+	}
+	tempDir := t.TempDir()
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("failed to chdir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
+
+	cwdPlugins := filepath.Join(tempDir, "plugins")
+	if err := os.MkdirAll(cwdPlugins, 0755); err != nil {
+		t.Fatalf("failed to create plugins dir: %v", err)
+	}
+
+	fakeBinary := filepath.Join(cwdPlugins, "michibiki-provider-evil")
+	if err := os.WriteFile(fakeBinary, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("failed to write fake binary: %v", err)
+	}
+	discovered, err := DiscoverPlugins(nil)
+	if err != nil {
+		t.Fatalf("DiscoverPlugins failed: %v", err)
+	}
+	for _, p := range discovered {
+		if p.Name == "evil" {
+			t.Fatalf("evil plugin in ./plugins was discovered without explicit directory configuration")
+		}
+	}
+	worldWritable := filepath.Join(tempDir, "michibiki-provider-writable")
+	if err := os.WriteFile(worldWritable, []byte("#!/bin/sh\nexit 0\n"), 0777); err != nil {
+		t.Fatalf("failed to write world-writable binary: %v", err)
+	}
+	_, err = InspectPlugin(worldWritable)
+	if err == nil {
+		t.Fatalf("expected InspectPlugin to reject world-writable binary")
+	}
+	if !strings.Contains(err.Error(), "insecure: group or world writable") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+func TestPlugin_ConnectSecurity(t *testing.T) {
+	tempDir := t.TempDir()
+
+	t.Run("rejects nonexistent binary", func(t *testing.T) {
+		p := NewPlugin(filepath.Join(tempDir, "michibiki-provider-missing"))
+		err := p.Connect(t.Context(), "http:test", nil, nil)
+		if err == nil {
+			t.Fatal("expected Connect to fail for missing binary")
+		}
+	})
+
+	t.Run("rejects world-writable plugin binary", func(t *testing.T) {
+		writableBin := filepath.Join(tempDir, "michibiki-provider-insecure")
+		if err := os.WriteFile(writableBin, []byte("#!/bin/sh\nexit 0\n"), 0777); err != nil {
+			t.Fatalf("failed to write insecure binary: %v", err)
+		}
+		p := NewPlugin(writableBin)
+		err := p.Connect(t.Context(), "http:test", nil, nil)
+		if err == nil {
+			t.Fatal("expected Connect to fail for world-writable binary")
+		}
+		if !strings.Contains(err.Error(), "insecure: group or world writable") {
+			t.Fatalf("unexpected error message: %v", err)
+		}
+	})
 }

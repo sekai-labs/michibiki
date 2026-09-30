@@ -53,23 +53,29 @@ func RenderDashboard(data DashboardData, width, height int) string {
 
 	var alertBanner string
 	if len(alerts) > 0 {
-		alertContent := theme.StyleError.Render("ALERTS:") + "\n"
+		var acb strings.Builder
+		acb.WriteString(theme.StyleError.Render("ALERTS:"))
+		acb.WriteByte('\n')
 		for _, a := range alerts {
-			alertContent += " • " + a + "\n"
+			acb.WriteString(" • ")
+			acb.WriteString(a)
+			acb.WriteByte('\n')
 		}
-		alertBanner = theme.StyleCardAlert.Width(width - 4).Render(strings.TrimSpace(alertContent))
+		alertBanner = theme.StyleCardAlert.Width(width - 4).Render(strings.TrimSpace(acb.String()))
 	}
 
 	uptimeStr := formatUptime(sys.UptimeSeconds)
-	deviceCardContent := fmt.Sprintf("%s\n\n", theme.StyleTitle.Render("SYSTEM OVERVIEW"))
-	deviceCardContent += fmt.Sprintf("%s %s\n", theme.StyleSubTitle.Render("Hostname:     "), sys.Hostname)
-	deviceCardContent += fmt.Sprintf("%s %s %s (%s)\n", theme.StyleSubTitle.Render("OS / Version: "), sys.OS, sys.Version, sys.Architecture)
-	deviceCardContent += fmt.Sprintf("%s %s\n", theme.StyleSubTitle.Render("Uptime:       "), uptimeStr)
-	deviceCardContent += fmt.Sprintf("%s %d cores\n", theme.StyleSubTitle.Render("CPU Cores:    "), sys.CPUCount)
+	var dcb strings.Builder
+	dcb.WriteString(theme.StyleTitle.Render("SYSTEM OVERVIEW"))
+	dcb.WriteString("\n\n")
+	fmt.Fprintf(&dcb, "%s %s\n", theme.StyleSubTitle.Render("Hostname:     "), sys.Hostname)
+	fmt.Fprintf(&dcb, "%s %s %s (%s)\n", theme.StyleSubTitle.Render("OS / Version: "), sys.OS, sys.Version, sys.Architecture)
+	fmt.Fprintf(&dcb, "%s %s\n", theme.StyleSubTitle.Render("Uptime:       "), uptimeStr)
+	fmt.Fprintf(&dcb, "%s %d cores\n", theme.StyleSubTitle.Render("CPU Cores:    "), sys.CPUCount)
 	if sys.SerialNumber != "" {
-		deviceCardContent += fmt.Sprintf("%s %s\n", theme.StyleSubTitle.Render("Serial Number:"), sys.SerialNumber)
+		fmt.Fprintf(&dcb, "%s %s\n", theme.StyleSubTitle.Render("Serial Number:"), sys.SerialNumber)
 	}
-	deviceCard := theme.StyleCard.Width(cardWidth).Render(deviceCardContent)
+	deviceCard := theme.StyleCard.Width(cardWidth).Render(dcb.String())
 
 	gaugeWidth := cardWidth - 18
 	if gaugeWidth < 8 {
@@ -89,41 +95,45 @@ func RenderDashboard(data DashboardData, width, height int) string {
 	}
 	diskGauge := theme.RenderProgressBar(diskPct, gaugeWidth)
 
-	resourcesContent := fmt.Sprintf("%s\n\n", theme.StyleTitle.Render("RESOURCE UTILIZATION"))
-	resourcesContent += fmt.Sprintf("%s %s %5.1f%%\n", theme.StyleSubTitle.Render("CPU Usage:"), cpuGauge, sys.CPUUsagePct)
-	resourcesContent += fmt.Sprintf("%s %s %5.1f%% (%s / %s)\n",
+	var rcb strings.Builder
+	rcb.WriteString(theme.StyleTitle.Render("RESOURCE UTILIZATION"))
+	rcb.WriteString("\n\n")
+	fmt.Fprintf(&rcb, "%s %s %5.1f%%\n", theme.StyleSubTitle.Render("CPU Usage:"), cpuGauge, sys.CPUUsagePct)
+	fmt.Fprintf(&rcb, "%s %s %5.1f%% (%s / %s)\n",
 		theme.StyleSubTitle.Render("Memory:   "),
 		memGauge,
 		memPct,
 		formatBytes(sys.MemoryUsedBytes),
 		formatBytes(sys.MemoryTotalBytes),
 	)
-	resourcesContent += fmt.Sprintf("%s %s %5.1f%% (%s / %s)\n",
+	fmt.Fprintf(&rcb, "%s %s %5.1f%% (%s / %s)\n",
 		theme.StyleSubTitle.Render("Storage:  "),
 		diskGauge,
 		diskPct,
 		formatBytes(sys.StorageUsed),
 		formatBytes(sys.StorageTotal),
 	)
-	resourcesCard := theme.StyleCard.Width(cardWidth).Render(resourcesContent)
+	resourcesCard := theme.StyleCard.Width(cardWidth).Render(rcb.String())
 
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, deviceCard, resourcesCard)
 
-	ifaceSummaryContent := fmt.Sprintf("%s\n\n", theme.StyleTitle.Render("INTERFACES & GATEWAYS SUMMARY"))
+	var isb strings.Builder
+	isb.WriteString(theme.StyleTitle.Render("INTERFACES & GATEWAYS SUMMARY"))
+	isb.WriteString("\n\n")
 	upCount := 0
 	for _, iface := range data.Interfaces {
 		if iface.OperStatus == model.OperStatusUp {
 			upCount++
 		}
 	}
-	ifaceSummaryContent += fmt.Sprintf("Interfaces: %d total, %s online, %s offline\n",
+	fmt.Fprintf(&isb, "Interfaces: %d total, %s online, %s offline\n",
 		len(data.Interfaces),
 		theme.StyleBadgeOnline.Render(fmt.Sprintf("%d UP", upCount)),
 		theme.StyleBadgeOffline.Render(fmt.Sprintf("%d DOWN", len(data.Interfaces)-upCount)),
 	)
-	ifaceSummaryContent += "\nGateways:\n"
+	isb.WriteString("\nGateways:\n")
 	if len(data.Gateways) == 0 {
-		ifaceSummaryContent += "  No gateways reported\n"
+		isb.WriteString("  No gateways reported\n")
 	}
 	for _, gw := range data.Gateways {
 		badge := theme.StyleBadgeOnline.Render("ONLINE")
@@ -134,7 +144,7 @@ func RenderDashboard(data DashboardData, width, height int) string {
 		if gw.IsDefault {
 			defStr = " [Default]"
 		}
-		ifaceSummaryContent += fmt.Sprintf("  • %-16s %-16s %s %6.1fms latency %4.1f%% loss%s\n",
+		fmt.Fprintf(&isb, "  • %-16s %-16s %s %6.1fms latency %4.1f%% loss%s\n",
 			gw.Name,
 			gw.Address,
 			badge,
@@ -143,7 +153,7 @@ func RenderDashboard(data DashboardData, width, height int) string {
 			defStr,
 		)
 	}
-	bottomCard := theme.StyleCard.Width(width - 4).Render(ifaceSummaryContent)
+	bottomCard := theme.StyleCard.Width(width - 4).Render(isb.String())
 
 	var fullView string
 	if alertBanner != "" {

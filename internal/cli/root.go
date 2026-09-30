@@ -8,21 +8,21 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 	"github.com/sekai-labs/michibiki/internal/handler/auth"
 	"github.com/sekai-labs/michibiki/internal/handler/network"
 	"github.com/sekai-labs/michibiki/internal/handler/session"
 	"github.com/sekai-labs/michibiki/pkg/config"
 	"github.com/sekai-labs/michibiki/pkg/provider"
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
-	flagDevice   string
-	flagURL      string
-	flagProvider string
-	flagOutput   string
-	flagInsecure bool
+	flagDevice    string
+	flagURL       string
+	flagProvider  string
+	flagOutput    string
+	flagInsecure  bool
 	flagConfig    string
 	flagNoColor   bool
 	flagTokenFile string

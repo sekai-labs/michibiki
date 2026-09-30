@@ -32,11 +32,16 @@ func RenderConfig(data ConfigData, width, height int) string {
 	if safetyStatusText == "" {
 		safetyStatusText = "Idle — no active commit-confirm rollback timers pending."
 	}
-	safetyContent := fmt.Sprintf("%s\n%s",
-		theme.StyleBadgeOnline.Render("SAFETY VERIFIED"),
-		safetyStatusText,
-	)
-	safetyCard := theme.StyleCard.Width(cardWidth).Render(safetyTitle + "\n\n" + safetyContent)
+	var scb strings.Builder
+	scb.WriteString(theme.StyleBadgeOnline.Render("SAFETY VERIFIED"))
+	scb.WriteByte('\n')
+	scb.WriteString(safetyStatusText)
+
+	var sb strings.Builder
+	sb.WriteString(safetyTitle)
+	sb.WriteString("\n\n")
+	sb.WriteString(scb.String())
+	safetyCard := theme.StyleCard.Width(cardWidth).Render(sb.String())
 
 	cfgTitle := theme.StyleTitle.Render("RUNNING CONFIGURATION")
 	cfgBody := data.RunningConfig
@@ -59,10 +64,20 @@ func RenderConfig(data ConfigData, width, height int) string {
 			lines = lines[:maxLines]
 			lines = append(lines, fmt.Sprintf("... (%d more lines truncated in view) ...", len(strings.Split(cfgBody, "\n"))-maxLines))
 		}
-		cfgBody = strings.Join(lines, "\n")
+		var linesB strings.Builder
+		for i, l := range lines {
+			if i > 0 {
+				linesB.WriteByte('\n')
+			}
+			linesB.WriteString(l)
+		}
+		cfgBody = linesB.String()
 	}
 
-	cfgCard := theme.StyleCard.Width(cardWidth).Render(cfgTitle + "\n\n" + cfgBody)
-
+	var cb strings.Builder
+	cb.WriteString(cfgTitle)
+	cb.WriteString("\n\n")
+	cb.WriteString(cfgBody)
+	cfgCard := theme.StyleCard.Width(cardWidth).Render(cb.String())
 	return lipgloss.JoinVertical(lipgloss.Left, safetyCard, cfgCard)
 }

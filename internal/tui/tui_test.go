@@ -366,6 +366,26 @@ func TestTUIResponsiveLayout(t *testing.T) {
 	if !strings.Contains(stackedDetailView, "Detail Inspector") {
 		t.Fatalf("stacked detail view should render Detail Inspector pane")
 	}
+
+	breakpoints := []struct {
+		w, h int
+	}{
+		{80, 24},
+		{100, 30},
+		{120, 40},
+		{160, 45},
+	}
+	for _, bp := range breakpoints {
+		resModel, _ := m.Update(tea.WindowSizeMsg{Width: bp.w, Height: bp.h})
+		v := resModel.(tui.Model).View()
+		if len(v) == 0 {
+			t.Fatalf("empty view at breakpoint %dx%d", bp.w, bp.h)
+		}
+		lineCount := strings.Count(v, "\n") + 1
+		if lineCount > bp.h {
+			t.Fatalf("view height %d exceeds terminal height %d at %dx%d", lineCount, bp.h, bp.w, bp.h)
+		}
+	}
 }
 
 func TestTUIListNavigationAndYank(t *testing.T) {

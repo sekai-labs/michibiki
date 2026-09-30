@@ -67,8 +67,18 @@ func RenderRouting(data RoutingData, width, height int) string {
 	if len(gwRows) == 0 {
 		gwRows = append(gwRows, theme.StyleMuted.Render("No gateways configured."))
 	}
-	gwCard := theme.StyleCard.Width(cardWidth).Render(gwTitle + "\n\n" + gwHeaderRendered + "\n" + strings.Join(gwRows, "\n"))
-
+	var gwb strings.Builder
+	gwb.WriteString(gwTitle)
+	gwb.WriteString("\n\n")
+	gwb.WriteString(gwHeaderRendered)
+	gwb.WriteByte('\n')
+	for i, r := range gwRows {
+		if i > 0 {
+			gwb.WriteByte('\n')
+		}
+		gwb.WriteString(r)
+	}
+	gwCard := theme.StyleCard.Width(cardWidth).Render(gwb.String())
 	routeTitle := theme.StyleTitle.Render(fmt.Sprintf("ROUTING TABLE (%d ROUTES)", len(data.Routes)))
 	routeHeader := fmt.Sprintf("%-24s %-18s %-14s %-12s %-8s %-10s",
 		"DESTINATION", "GATEWAY", "INTERFACE", "PROTOCOL", "METRIC", "SCOPE")
@@ -105,8 +115,18 @@ func RenderRouting(data RoutingData, width, height int) string {
 	if len(routeRows) == 0 {
 		routeRows = append(routeRows, theme.StyleMuted.Render("No routes found."))
 	}
-	routeCard := theme.StyleCard.Width(cardWidth).Render(routeTitle + "\n\n" + routeHeaderRendered + "\n" + strings.Join(routeRows, "\n"))
-
+	var rtb strings.Builder
+	rtb.WriteString(routeTitle)
+	rtb.WriteString("\n\n")
+	rtb.WriteString(routeHeaderRendered)
+	rtb.WriteByte('\n')
+	for i, r := range routeRows {
+		if i > 0 {
+			rtb.WriteByte('\n')
+		}
+		rtb.WriteString(r)
+	}
+	routeCard := theme.StyleCard.Width(cardWidth).Render(rtb.String())
 	var bgpCard string
 	if len(data.Neighbors) > 0 {
 		bgpTitle := theme.StyleTitle.Render(fmt.Sprintf("BGP NEIGHBORS (%d)", len(data.Neighbors)))
@@ -135,7 +155,18 @@ func RenderRouting(data RoutingData, width, height int) string {
 				bgpRows = append(bgpRows, theme.StyleTableRowAlt.Render(line))
 			}
 		}
-		bgpCard = theme.StyleCard.Width(cardWidth).Render(bgpTitle + "\n\n" + bgpHeaderRendered + "\n" + strings.Join(bgpRows, "\n"))
+		var bgpb strings.Builder
+		bgpb.WriteString(bgpTitle)
+		bgpb.WriteString("\n\n")
+		bgpb.WriteString(bgpHeaderRendered)
+		bgpb.WriteByte('\n')
+		for i, r := range bgpRows {
+			if i > 0 {
+				bgpb.WriteByte('\n')
+			}
+			bgpb.WriteString(r)
+		}
+		bgpCard = theme.StyleCard.Width(cardWidth).Render(bgpb.String())
 	}
 
 	if bgpCard != "" {

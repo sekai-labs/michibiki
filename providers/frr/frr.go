@@ -22,6 +22,17 @@ func init() {
 	})
 }
 
+func escapeShellArg(s string) (string, error) {
+	if strings.ContainsRune(s, 0) {
+		return "", fmt.Errorf("command contains null byte")
+	}
+	var b strings.Builder
+	b.WriteByte('\'')
+	b.WriteString(strings.ReplaceAll(s, "'", "'\\''"))
+	b.WriteByte('\'')
+	return b.String(), nil
+}
+
 type Provider struct {
 	mu        sync.RWMutex
 	sshClient *client.SSHClient
@@ -66,7 +77,24 @@ func (p *Provider) Connect(ctx context.Context, endpoint string, creds *credenti
 		opts.KeyPath = creds.SSHKeyPath
 	}
 
-	p.sshClient = client.NewSSHClient(opts)
+	if options != nil {
+		if hosts, ok := options["known_hosts"]; ok && hosts != "" {
+			opts.KnownHostsFile = hosts
+		}
+		if insecure, ok := options["insecure"]; ok && (insecure == "true" || insecure == "1") {
+			opts.InsecureIgnoreHostKey = true
+		}
+		if insecure, ok := options["insecure_ignore_host_key"]; ok && (insecure == "true" || insecure == "1") {
+			opts.InsecureIgnoreHostKey = true
+		}
+	}
+
+	sshClient := client.NewSSHClient(opts)
+	if err := sshClient.Connect(ctx); err != nil {
+		return fmt.Errorf("failed to connect to FRR via SSH: %w", err)
+	}
+
+	p.sshClient = sshClient
 	p.connected = true
 	p.endpoint = endpoint
 	return nil
@@ -100,7 +128,11 @@ func (p *Provider) runVtysh(ctx context.Context, cmd string) (string, error) {
 	if !p.connected || p.sshClient == nil {
 		return "", provider.ErrNotConnected
 	}
-	return p.sshClient.RunCommand(ctx, fmt.Sprintf("vtysh -c %q", cmd))
+	escaped, err := escapeShellArg(cmd)
+	if err != nil {
+		return "", fmt.Errorf("invalid vtysh command: %w", err)
+	}
+	return p.sshClient.RunCommand(ctx, fmt.Sprintf("vtysh -c %s", escaped))
 }
 
 func (p *Provider) GetSystemInfo(ctx context.Context) (*model.SystemInfo, error) {

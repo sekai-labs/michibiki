@@ -11,7 +11,6 @@ import (
 	"github.com/sekai-labs/michibiki/pkg/provider"
 )
 
-
 func TestNetworkHandler_GetDeviceOverview(t *testing.T) {
 	ctx := context.Background()
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -147,6 +148,14 @@ func InstallFromURL(ctx context.Context, downloadURL string, opts InstallOptions
 		return "", err
 	}
 
+	parsedURL, err := url.Parse(downloadURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid download URL: %w", err)
+	}
+	if parsedURL.Scheme != "https" && parsedURL.Scheme != "http" {
+		return "", fmt.Errorf("unsupported download scheme %q (only http and https allowed)", parsedURL.Scheme)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 	if err != nil {
 		return "", err
@@ -171,16 +180,18 @@ func InstallFromURL(ctx context.Context, downloadURL string, opts InstallOptions
 		return extractZip(resp.Body, targetDir, opts.Force)
 	}
 
-	parts := strings.Split(downloadURL, "/")
-	rawName := parts[len(parts)-1]
-	if qIdx := strings.Index(rawName, "?"); qIdx != -1 {
-		rawName = rawName[:qIdx]
+	baseName := filepath.Base(parsedURL.Path)
+	if baseName == "." || baseName == "/" || baseName == "" {
+		return "", fmt.Errorf("cannot determine plugin binary name from URL %s", downloadURL)
 	}
-	if !strings.HasPrefix(rawName, "michibiki-provider-") {
-		rawName = "michibiki-provider-" + rawName
+	if !strings.HasPrefix(baseName, "michibiki-provider-") {
+		baseName = "michibiki-provider-" + baseName
 	}
 
-	destPath := filepath.Join(targetDir, rawName)
+	destPath, err := isSafeArchivePath(targetDir, baseName)
+	if err != nil {
+		return "", err
+	}
 	if _, err := os.Stat(destPath); err == nil && !opts.Force {
 		return "", fmt.Errorf("plugin already exists at %s (use --force to overwrite)", destPath)
 	}
@@ -191,10 +202,33 @@ func InstallFromURL(ctx context.Context, downloadURL string, opts InstallOptions
 	}
 	defer destFile.Close()
 
-	if _, err := io.Copy(destFile, resp.Body); err != nil {
+	limitedReader := io.LimitReader(resp.Body, maxPluginSize+1)
+	written, err := io.Copy(destFile, limitedReader)
+	if err != nil {
 		return "", err
 	}
+	if written > maxPluginSize {
+		_ = os.Remove(destPath)
+		return "", fmt.Errorf("plugin binary exceeds maximum allowed size (%d bytes)", maxPluginSize)
+	}
+	return destPath, nil
+}
 
+const (
+	maxPluginSize = 100 * 1024 * 1024
+)
+
+func isSafeArchivePath(targetDir, name string) (string, error) {
+	cleanName := filepath.Clean(name)
+	if strings.HasPrefix(cleanName, "..") || strings.HasPrefix(cleanName, "/") || strings.HasPrefix(cleanName, `\`) {
+		return "", fmt.Errorf("insecure archive entry path: %q", name)
+	}
+
+	destPath := filepath.Join(targetDir, filepath.Base(cleanName))
+	rel, err := filepath.Rel(targetDir, destPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("archive entry escapes target directory: %q", name)
+	}
 	return destPath, nil
 }
 
@@ -214,10 +248,17 @@ func extractTarGz(r io.Reader, targetDir string, force bool) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		if header.Typeflag == tar.TypeSymlink || header.Typeflag == tar.TypeLink {
+			continue
+		}
 
 		baseName := filepath.Base(header.Name)
 		if strings.HasPrefix(baseName, "michibiki-provider-") && !header.FileInfo().IsDir() {
-			destPath := filepath.Join(targetDir, baseName)
+			destPath, err := isSafeArchivePath(targetDir, header.Name)
+			if err != nil {
+				return "", err
+			}
+
 			if _, err := os.Stat(destPath); err == nil && !force {
 				return "", fmt.Errorf("plugin already exists at %s (use --force)", destPath)
 			}
@@ -226,8 +267,15 @@ func extractTarGz(r io.Reader, targetDir string, force bool) (string, error) {
 				return "", err
 			}
 			defer f.Close()
-			if _, err := io.Copy(f, tr); err != nil {
+
+			limitedReader := io.LimitReader(tr, maxPluginSize+1)
+			written, err := io.Copy(f, limitedReader)
+			if err != nil {
 				return "", err
+			}
+			if written > maxPluginSize {
+				_ = os.Remove(destPath)
+				return "", fmt.Errorf("plugin archive entry exceeds maximum allowed size (%d bytes)", maxPluginSize)
 			}
 			return destPath, nil
 		}
@@ -243,8 +291,13 @@ func extractZip(r io.Reader, targetDir string, force bool) (string, error) {
 	defer os.Remove(tempZip.Name())
 	defer tempZip.Close()
 
-	if _, err := io.Copy(tempZip, r); err != nil {
+	limitedZipReader := io.LimitReader(r, maxPluginSize+1)
+	written, err := io.Copy(tempZip, limitedZipReader)
+	if err != nil {
 		return "", err
+	}
+	if written > maxPluginSize {
+		return "", fmt.Errorf("plugin archive exceeds maximum allowed size (%d bytes)", maxPluginSize)
 	}
 
 	stat, err := tempZip.Stat()
@@ -258,9 +311,17 @@ func extractZip(r io.Reader, targetDir string, force bool) (string, error) {
 	}
 
 	for _, f := range zr.File {
+		if f.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+
 		baseName := filepath.Base(f.Name)
 		if strings.HasPrefix(baseName, "michibiki-provider-") && !f.FileInfo().IsDir() {
-			destPath := filepath.Join(targetDir, baseName)
+			destPath, err := isSafeArchivePath(targetDir, f.Name)
+			if err != nil {
+				return "", err
+			}
+
 			if _, err := os.Stat(destPath); err == nil && !force {
 				return "", fmt.Errorf("plugin already exists at %s (use --force)", destPath)
 			}
@@ -276,8 +337,14 @@ func extractZip(r io.Reader, targetDir string, force bool) (string, error) {
 			}
 			defer df.Close()
 
-			if _, err := io.Copy(df, rc); err != nil {
+			limitedEntryReader := io.LimitReader(rc, maxPluginSize+1)
+			entryWritten, err := io.Copy(df, limitedEntryReader)
+			if err != nil {
 				return "", err
+			}
+			if entryWritten > maxPluginSize {
+				_ = os.Remove(destPath)
+				return "", fmt.Errorf("plugin archive entry exceeds maximum allowed size (%d bytes)", maxPluginSize)
 			}
 			return destPath, nil
 		}

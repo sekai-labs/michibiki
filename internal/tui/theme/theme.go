@@ -7,169 +7,189 @@ import (
 )
 
 var (
-	ColorEmerald   = lipgloss.Color("#73daca")
-	ColorCrimson   = lipgloss.Color("#f7768e")
-	ColorAmber     = lipgloss.Color("#e0af68")
-	ColorCyan      = lipgloss.Color("#7dcfff")
-	ColorPurple    = lipgloss.Color("#bb9af7")
-	ColorGray      = lipgloss.Color("#565f89")
-	ColorDarkGray  = lipgloss.Color("#24283b")
-	ColorLightGray = lipgloss.Color("#c0caf5")
-	ColorWhite     = lipgloss.Color("#ffffff")
-	ColorBg        = lipgloss.Color("#1a1b26")
-	ColorCardBg    = lipgloss.Color("#1f2335")
-	ColorAccent    = lipgloss.Color("#7aa2f7")
+	BgBase    = lipgloss.Color("#0F172A")
+	BgCard    = lipgloss.Color("#1E293B")
+	BgOverlay = lipgloss.Color("#0A0F1D")
+	BgActive  = lipgloss.Color("#334155")
+
+	BorderInactive = lipgloss.Color("#334155")
+	BorderActive   = lipgloss.Color("#38BDF8")
+	BorderMuted    = lipgloss.Color("#1E293B")
+
+	TextPrimary   = lipgloss.Color("#F8FAFC")
+	TextSecondary = lipgloss.Color("#94A3B8")
+	TextMuted     = lipgloss.Color("#64748B")
+	TextDisabled  = lipgloss.Color("#475569")
+
+	AccentCyan   = lipgloss.Color("#38BDF8")
+	AccentViolet = lipgloss.Color("#A855F7")
+	AccentGreen  = lipgloss.Color("#34D399")
+	AccentAmber  = lipgloss.Color("#FBBF24")
+	AccentRose   = lipgloss.Color("#F43F5E")
+
+	ColorEmerald   = AccentGreen
+	ColorCrimson   = AccentRose
+	ColorAmber     = AccentAmber
+	ColorCyan      = AccentCyan
+	ColorPurple    = AccentViolet
+	ColorGray      = TextMuted
+	ColorDarkGray  = BorderInactive
+	ColorLightGray = TextSecondary
+	ColorWhite     = TextPrimary
+	ColorBg        = BgBase
+	ColorCardBg    = BgCard
+	ColorAccent    = AccentCyan
 
 	StyleHeader = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorBg).
-			Background(ColorAccent).
+			Foreground(BgBase).
+			Background(AccentCyan).
 			Padding(0, 1)
 
 	StyleHeaderSub = lipgloss.NewStyle().
-			Foreground(ColorLightGray).
-			Background(ColorDarkGray).
+			Bold(true).
+			Foreground(TextSecondary).
+			Background(BgCard).
 			Padding(0, 1)
 
 	StyleBadgeOnline = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(ColorBg).
-				Background(ColorEmerald).
+				Foreground(lipgloss.Color("#064E3B")).
+				Background(AccentGreen).
 				Padding(0, 1)
 
 	StyleBadgeOffline = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(ColorWhite).
-				Background(ColorCrimson).
+				Foreground(lipgloss.Color("#FFF1F2")).
+				Background(AccentRose).
 				Padding(0, 1)
 
 	StyleBadgeWarning = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(ColorBg).
-				Background(ColorAmber).
+				Foreground(lipgloss.Color("#78350F")).
+				Background(AccentAmber).
 				Padding(0, 1)
 
 	StyleBadgeInfo = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorBg).
-			Background(ColorCyan).
+			Foreground(lipgloss.Color("#082F49")).
+			Background(AccentCyan).
 			Padding(0, 1)
 
 	StyleTabActive = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorBg).
-			Background(ColorAccent).
+			Foreground(BgBase).
+			Background(AccentCyan).
 			Padding(0, 1)
 
 	StyleTabInactive = lipgloss.NewStyle().
-				Foreground(ColorLightGray).
-				Background(ColorDarkGray).
+				Foreground(TextSecondary).
+				Background(BgCard).
 				Padding(0, 1)
 
 	StyleCard = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorDarkGray).
+			BorderForeground(BorderInactive).
 			Padding(0, 1)
 
 	StyleCardActive = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorAccent).
+			BorderForeground(BorderActive).
 			Padding(0, 1)
 
 	StyleCardAlert = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorCrimson).
+			BorderForeground(AccentRose).
 			Padding(0, 1)
 
 	StyleTitle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorCyan)
+			Foreground(AccentCyan)
 
 	StyleSubTitle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorLightGray)
+			Foreground(TextSecondary)
 
 	StyleTableHeader = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(ColorAccent).
+				Foreground(AccentCyan).
 				Border(lipgloss.NormalBorder(), false, false, true, false).
-				BorderForeground(ColorDarkGray)
+				BorderForeground(BorderInactive)
 
 	StyleTableRow = lipgloss.NewStyle().
-			Foreground(ColorWhite)
+			Foreground(TextPrimary)
 
 	StyleTableRowAlt = lipgloss.NewStyle().
-				Foreground(ColorLightGray)
+				Foreground(TextSecondary)
 
 	StyleStatusBar = lipgloss.NewStyle().
-			Foreground(ColorLightGray).
-			Background(ColorDarkGray).
+			Foreground(TextSecondary).
+			Background(BgCard).
 			Padding(0, 1)
 
 	StyleStatusKey = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorCyan)
+			Foreground(AccentCyan)
 
 	StyleProgressFilled = lipgloss.NewStyle().
-				Foreground(ColorEmerald)
+				Foreground(AccentGreen)
 
 	StyleProgressFilledWarn = lipgloss.NewStyle().
-				Foreground(ColorAmber)
+				Foreground(AccentAmber)
 
 	StyleProgressFilledDanger = lipgloss.NewStyle().
-					Foreground(ColorCrimson)
+					Foreground(AccentRose)
 
 	StyleProgressEmpty = lipgloss.NewStyle().
-				Foreground(ColorDarkGray)
+				Foreground(BorderInactive)
 
 	StyleFreeIP = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorEmerald).
-			Background(ColorDarkGray).
+			Foreground(AccentGreen).
+			Background(BgActive).
 			Padding(0, 1)
 
 	StyleMuted = lipgloss.NewStyle().
-			Foreground(ColorGray)
+			Foreground(TextMuted)
 
 	StyleError = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorCrimson)
+			Foreground(AccentRose)
 
 	StyleDockSelected = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(ColorWhite).
-				Background(ColorDarkGray)
+				Foreground(TextPrimary).
+				Background(BgActive)
 
 	StyleSubTabActive = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(ColorBg).
-				Background(ColorAccent).
+				Foreground(BgBase).
+				Background(AccentCyan).
 				Padding(0, 1)
 
 	StyleSubTabInactive = lipgloss.NewStyle().
-				Foreground(ColorLightGray).
-				Background(ColorDarkGray).
+				Foreground(TextSecondary).
+				Background(BgCard).
 				Padding(0, 1)
 
 	StyleCursor = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(ColorAccent)
+			Foreground(AccentCyan)
 
 	StyleModal = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorAccent).
-			Background(ColorBg).
+			BorderForeground(BorderActive).
+			Background(BgCard).
 			Padding(1, 2)
 )
 
 func RenderProgressBar(pct float64, width int) string {
-	if width < 3 {
-		width = 10
+	if width < 4 {
+		width = 4
 	}
 	if pct < 0 {
 		pct = 0
-	}
-	if pct > 100 {
+	} else if pct > 100 {
 		pct = 100
 	}
 
@@ -189,5 +209,8 @@ func RenderProgressBar(pct float64, width int) string {
 		filledStyle = StyleProgressFilledWarn
 	}
 
-	return filledStyle.Render(filledStr) + StyleProgressEmpty.Render(emptyStr)
+	var b strings.Builder
+	b.WriteString(filledStyle.Render(filledStr))
+	b.WriteString(StyleProgressEmpty.Render(emptyStr))
+	return b.String()
 }
